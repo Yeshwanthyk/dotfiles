@@ -23,6 +23,8 @@ packer.startup(function(use)
   -- colorschemes
   use 'folke/tokyonight.nvim'
   use 'catppuccin/nvim'
+  use "rebelot/kanagawa.nvim"
+  use "EdenEast/nightfox.nvim"
 
   use 'glepnir/lspsaga.nvim' -- LSP UIs
   use 'L3MON4D3/LuaSnip'
