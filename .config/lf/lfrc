@@ -36,7 +36,7 @@ map "'"
 map '"'
 map d
 
-map c $vscodium "$f"
+map c $code "$f"
 
 map au unarchive
 

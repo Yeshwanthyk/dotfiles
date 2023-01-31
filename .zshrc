@@ -452,3 +452,5 @@ ex=:\
 *.nix=:\
 "
 
+source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
+source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
