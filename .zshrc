@@ -49,14 +49,10 @@ alias capslock='setxkbmap -option caps:escape'
 alias tzer='bash ~/.tmux/scripts/tmux-sessionizer.sh'
 alias wimg="wget -nd -H -p -A jpg,jpeg,png,gif -e robots=off "
 
-# hw
-alias hstag="ssh root@167.71.25.31"
-alias hprod="ssh root@104.236.46.182"
-
 # Generate random password
 alias p="openssl rand -base64 32"
 
-alias ytmp3="youtube-dl --extract-audio --audio-format mp3 "
+alias ytmp3="yt-dlp -f 'ba' -x --audio-format mp3 -o '%(title)s.%(ext)s'"
 
 
 # GIT ALIASES -----------------------------------------------------------------
