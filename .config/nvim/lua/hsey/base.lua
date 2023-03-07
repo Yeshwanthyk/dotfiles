@@ -2,7 +2,7 @@ vim.cmd("autocmd!")
 
 vim.g.mapleader = ","
 
-vim.cmd [[ colorscheme kanagawa ]]
+vim.cmd [[ colorscheme catppuccin ]]
 
 vim.scriptencoding = 'utf-8'
 vim.opt.encoding = 'utf-8'
