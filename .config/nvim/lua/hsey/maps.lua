@@ -47,9 +47,6 @@ vim.keymap.set("n", "<leader>s", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><
 -- make current file executable
 vim.keymap.set("n", "<leader>x", "<cmd>!chmod +x %<CR>", { silent = true })
 
--- Turn off highlighting
-vim.keymap.set("n", "<leader>h", "<cmd>nohlsearch<CR>", { noremap = true, silent = true })
-
 -- Faster way to save a file
 vim.keymap.set("n", "<leader><leader>", ":w<CR>", { noremap = true, silent = true })
 

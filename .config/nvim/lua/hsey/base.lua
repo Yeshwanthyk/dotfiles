@@ -2,42 +2,55 @@ vim.cmd("autocmd!")
 
 vim.g.mapleader = ","
 
+vim.opt.guicursor = ""
+
 vim.cmd [[ colorscheme catppuccin ]]
 
 vim.scriptencoding = 'utf-8'
 vim.opt.encoding = 'utf-8'
 vim.opt.fileencoding = 'utf-8'
 
-vim.wo.number = true
+vim.opt.nu = true
+vim.opt.relativenumber = true
 
 vim.opt.title = true
 vim.opt.autoindent = true
 vim.opt.smartindent = true
-vim.opt.hlsearch = true
+vim.opt.hlsearch = false
+vim.opt.incsearch = true
 
 -- undotree
 vim.opt.swapfile = false
 vim.opt.backup = false
 vim.opt.undofile = true
-vim.opt.undodir = '/Users/yesh/.cache/nvim/undodir'
+vim.opt.undodir = os.getenv("HOME") .. '/.cache/nvim/undodir'
 
 vim.opt.showcmd = true
 vim.opt.cmdheight = 1
 vim.opt.laststatus = 2
-vim.opt.expandtab = true
-vim.opt.scrolloff = 10
-vim.opt.shell = 'fish'
+vim.opt.shell = 'zsh'
 vim.opt.backupskip = { '/tmp/*', '/private/tmp/*' }
 vim.opt.inccommand = 'split'
 vim.opt.ignorecase = true -- Case insensitive searching UNLESS /C or capital in search
 vim.opt.smarttab = true
 vim.opt.breakindent = true
-vim.opt.shiftwidth = 2
-vim.opt.tabstop = 2
+
+vim.opt.tabstop = 4
+vim.opt.softtabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.expandtab = true
+
 vim.opt.wrap = false -- No Wrap lines
+
+vim.opt.scrolloff = 10
+vim.opt.signcolumn = "yes"
+vim.opt.isfname:append("@-@")
+
 vim.opt.backspace = { 'start', 'eol', 'indent' }
 vim.opt.path:append { '**' } -- Finding files - Search down into subfolders
 vim.opt.wildignore:append { '*/node_modules/*' }
+vim.opt.updatetime = 50
+vim.opt.colorcolumn = "80"
 
 -- clipboard
 -- vim.opt.clipboard:append { 'unnamedplus' }
