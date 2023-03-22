@@ -54,6 +54,8 @@ packer.startup(function(use)
   use 'dinhhuy258/git.nvim' -- For git blame & browse
   use 'numToStr/Comment.nvim'
 
+  use 'github/copilot.vim'
+
   use {
 	'nvim-tree/nvim-tree.lua',
 	requires = {

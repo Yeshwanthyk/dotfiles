@@ -40,7 +40,7 @@ vim.opt.path:append { '**' } -- Finding files - Search down into subfolders
 vim.opt.wildignore:append { '*/node_modules/*' }
 
 -- clipboard
-vim.opt.clipboard:append { 'unnamedplus' }
+-- vim.opt.clipboard:append { 'unnamedplus' }
 
 -- Undercurl
 vim.cmd([[let &t_Cs = "\e[4:3m"]])
