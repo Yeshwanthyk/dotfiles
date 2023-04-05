@@ -4,7 +4,7 @@ vim.g.mapleader = ","
 
 vim.opt.guicursor = ""
 
-vim.cmd [[ colorscheme catppuccin ]]
+vim.cmd [[ colorscheme tokyonight ]]
 
 vim.scriptencoding = 'utf-8'
 vim.opt.encoding = 'utf-8'
@@ -35,9 +35,9 @@ vim.opt.ignorecase = true -- Case insensitive searching UNLESS /C or capital in 
 vim.opt.smarttab = true
 vim.opt.breakindent = true
 
-vim.opt.tabstop = 4
-vim.opt.softtabstop = 4
-vim.opt.shiftwidth = 4
+vim.opt.tabstop = 2
+vim.opt.softtabstop = 2
+vim.opt.shiftwidth = 2
 vim.opt.expandtab = true
 
 vim.opt.wrap = false -- No Wrap lines

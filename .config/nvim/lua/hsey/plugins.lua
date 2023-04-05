@@ -57,6 +57,18 @@ packer.startup(function(use)
   use 'github/copilot.vim'
 
   use {
+  "folke/trouble.nvim",
+  requires = "nvim-tree/nvim-web-devicons",
+  config = function()
+    require("trouble").setup {
+      -- your configuration comes here
+      -- or leave it empty to use the default settings
+      -- refer to the configuration section below
+    }
+  end
+ }
+
+  use {
 	'nvim-tree/nvim-tree.lua',
 	requires = {
 	  'nvim-tree/nvim-web-devicons', -- optional, for file icons

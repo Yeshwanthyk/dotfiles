@@ -98,7 +98,7 @@ vim.lsp.handlers["textDocument/publishDiagnostics"] = vim.lsp.with(
   vim.lsp.diagnostic.on_publish_diagnostics, {
   underline = true,
   update_in_insert = false,
-  -- virtual_text =false,
+  virtual_text =false,
   severity_sort = true,
 }
 )
@@ -111,7 +111,7 @@ for type, icon in pairs(signs) do
 end
 
 vim.diagnostic.config({
-  -- virtual_text = false,
+  virtual_text = false,
   update_in_insert = true,
   float = {
     source = "always", -- Or "if_many"
