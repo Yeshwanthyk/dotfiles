@@ -4,6 +4,3 @@
 
 -- Move window
 vim.keymap.set("n", "<Space>", "<C-w>w")
-
--- Faster way to save a file
-vim.keymap.set("n", "<leader><leader>", ":w<CR>", { noremap = true, silent = true })

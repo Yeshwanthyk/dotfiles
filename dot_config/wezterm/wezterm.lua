@@ -22,6 +22,7 @@ return {
 	window_background_opacity = 1,
 	initial_cols = 150,
 	initial_rows = 40,
+	color_scheme = "Tokyo Night",
 
 	window_padding = {
 		left = 20,
