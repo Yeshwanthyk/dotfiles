@@ -311,13 +311,23 @@ themes {
         orange 255 158 100
         gray 65 72 104
       }
+      tokyonight-moon {
+        fg "#c8d3f5"
+        bg "#222436"
+        black "#222436"
+        red "#ff757f"
+        green "#c3e88d"
+        yellow "#ffc777"
+        blue "#82aaff"
+        magenta "#c099ff"
+        cyan "#86e1fc"
+        white "#828bb8"
+        orange "#ff966c"
+    }
 }
-theme "tokyo-night"
+theme "tokyonight-moon"
 
-// The name of the default layout to load on startup
-// Default: "default"
-//
-// default_layout "compact"
+// default_layout "default_top_bars"
 
 // Choose the mode that zellij uses when starting up.
 // Default: normal
