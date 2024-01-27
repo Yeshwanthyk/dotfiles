@@ -293,13 +293,6 @@ keybinds clear-defaults=true {
         bind "d" { Detach; }
     }
     shared_except "locked" {
-        bind "F1" {
-            LaunchOrFocusPlugin "file:~/.config/zellij/plugins/monocle" {
-                floating true
-            }
-        }
-    }
-    shared_except "locked" {
         bind "Ctrl y" {
             LaunchOrFocusPlugin "file:~/.config/zellij/plugins/room.wasm" {
                 floating true
@@ -307,6 +300,14 @@ keybinds clear-defaults=true {
         }
     }
 }
+
+plugins {
+    tab-bar { path "tab-bar"; }
+    status-bar { path "status-bar"; }
+    strider { path "strider"; }
+    compact-bar { path "compact-bar"; }
+}
+
 
 // Choose what to do when zellij receives SIGTERM, SIGINT, SIGQUIT or SIGHUP
 // eg. when terminal window with an active zellij session is closed
@@ -321,7 +322,7 @@ keybinds clear-defaults=true {
 //   - true
 //   - false (Default)
 //
-// simplified_ui true
+simplified_ui false
 
 // Choose the path to the default shell that zellij will use for opening new panes
 // Default: $SHELL
@@ -333,17 +334,17 @@ default_shell "fish"
 //   - true (default)
 //   - false
 //
-// pane_frames true
+pane_frames true
 
 // Choose the theme that is specified in the themes section.
 // Default: default
 //
-theme "catppuccin-mocha" 
+theme "tokyo-night" 
 
 // The name of the default layout to load on startup
 // Default: "default"
 //
-// default_layout "compact"
+default_layout "terminal"
 
 // Choose the mode that zellij uses when starting up.
 // Default: normal
@@ -390,12 +391,13 @@ copy_command "wl-copy"
 // Enable or disable automatic copy (and clear) of selection when releasing mouse
 // Default: true
 //
-// copy_on_select false
+copy_on_select true
 
 // Path to the default editor to use to edit pane scrollbuffer
 // Default: $EDITOR or $VISUAL
 //
-scrollback_editor "/usr/bin/micro"
+scrollback_editor "/opt/homebrew/bin/nvim"
+
 
 // When attaching to an existing session with other users,
 // should the session be mirrored (true)
@@ -411,13 +413,6 @@ scrollback_editor "/usr/bin/micro"
 // The folder in which Zellij will look for themes
 //
 // theme_dir "/path/to/my/theme_dir"
-
-plugins {
-    tab-bar { path "tab-bar"; }
-    status-bar { path "status-bar"; }
-    strider { path "strider"; }
-    compact-bar { path "compact-bar"; }
-}
 
 ui {
     pane_frames {
@@ -476,5 +471,19 @@ themes {
         cyan 137 220 235
         white 205 214 244
         orange 250 179 135
+    }
+    tokyo-night {
+        bg 36 40 59
+        fg 192 202 245
+        black 29 32 47
+        red 247 118 142
+        green 158 206 106
+        yellow 224 175 104
+        blue 122 162 247
+        magenta 187 154 247
+        cyan 125 207 255
+        white 169 177 214
+        orange 255 158 100
+        gray 65 72 104
     }
 }
