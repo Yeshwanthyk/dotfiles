@@ -4,3 +4,6 @@
 
 -- Move window
 vim.keymap.set("n", "<Space>", "<C-w>w")
+
+-- https://github.com/dustinblackman/oatmeal.nvim/issues/8#issuecomment-1913923693
+vim.api.nvim_set_keymap("t", "<Esc>", "<C-\\><C-n>", { noremap = true })

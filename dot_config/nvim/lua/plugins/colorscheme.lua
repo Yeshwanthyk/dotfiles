@@ -1,5 +1,11 @@
 return {
-  { "shaunsingh/oxocarbon.nvim" },
+  { "EdenEast/nightfox.nvim" },
+  {
+    "craftzdog/solarized-osaka.nvim",
+    lazy = false,
+    priority = 1000,
+    opts = {},
+  },
   {
     "tokyonight.nvim",
     priority = 1000,
@@ -58,5 +64,15 @@ return {
         end,
       }
     end,
+  },
+
+  -- Configure LazyVim to load gruvbox
+
+  {
+
+    "LazyVim/LazyVim",
+    opts = {
+      colorscheme = "catppuccin",
+    },
   },
 }
