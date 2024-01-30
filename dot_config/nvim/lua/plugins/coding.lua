@@ -44,4 +44,11 @@ return {
     cmd = "IncRename",
     config = true,
   },
+  {
+    "ThePrimeagen/harpoon",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+    },
+  },
+  { "mbbill/undotree" },
 }
