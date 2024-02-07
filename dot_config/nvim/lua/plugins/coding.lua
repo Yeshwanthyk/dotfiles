@@ -40,4 +40,14 @@ return {
     opts = {},
     keys = { { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "DiffView" } },
   },
+
+  -- fugitive: Git blame and open in GitHub
+  {
+    "tpope/vim-fugitive",
+    lazy = true,
+    cmd = "Git",
+    keys = {
+      { "<leader>gb", "<cmd>Git blame<cr>", desc = "Git Blame" },
+    },
+  },
 }
