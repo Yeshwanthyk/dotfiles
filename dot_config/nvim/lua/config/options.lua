@@ -5,3 +5,6 @@
 vim.g.mapleader = ","
 
 vim.opt.mousescroll = "ver:2,hor:6"
+
+-- Disabling option that makes '+y does not copy anything
+vim.opt_local.clipboard = ""
