@@ -20,12 +20,28 @@ return {
       "psto/friendly-snippets",
       config = function()
         -- specify the path so that friendly-snippets are not duplicated
-        require("luasnip.loaders.from_vscode").lazy_load()
+        require("luasnip.loaders.from_vscode").lazy_load({ paths = { "~/.config/nvim/snippets" } })
         require("luasnip").filetype_extend("typescript", { "javascript" })
         require("luasnip").filetype_extend("typescriptreact", { "javascriptreact" })
       end,
     },
   },
+
+  {
+    "chrisgrieser/nvim-scissors",
+    dependencies = {
+      "rcarriga/nvim-notify",
+    },
+    opts = {
+      jsonFormatter = "jq",
+    },
+    -- stylua: ignore
+    keys = {
+      { "<leader>cS", function() require("scissors").editSnippet() end, desc = "Edit Snippets" },
+      { "<leader>cs", function() require("scissors").addNewSnippet() end, desc = "Add Snippets" },
+    },
+  },
+
   -- Incremental rename
   {
     "smjonas/inc-rename.nvim",
