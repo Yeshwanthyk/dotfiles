@@ -38,3 +38,34 @@ vim.keymap.set("n", "<leader>Y", [["+Y]])
 
 -- Delete to void register
 vim.keymap.set({ "n", "v" }, "<leader>d", [["_d]])
+
+-- . repeat or execute macro on all visually selected lines
+vim.keymap.set("x", ".", ":norm .<CR>", nosilent)
+vim.keymap.set("x", "@", ":norm @q<CR>", nosilent)
+
+-- jump back to original place
+vim.keymap.set("n", "<BS>", "<C-o>")
+
+-- jk,kj to go to normal mode
+vim.keymap.set("i", "jk", "<Esc>")
+vim.keymap.set("i", "kj", "<Esc>")
+
+-- hitting W or Q will also run :w :q
+vim.api.nvim_create_user_command("W", "w", { nargs = 0 })
+vim.api.nvim_create_user_command("Q", "q", { nargs = 0 })
+
+vim.keymap.set("n", "<C-d>", "<C-d>zz", { desc = "scroll down and then center the cursorline" })
+
+vim.keymap.set("n", "<C-u>", "<C-u>zz", { desc = "scroll up and then center the cursorline" })
+
+vim.keymap.set("n", "zo", "zozz", { desc = "open fold and then center the cursorline" })
+
+vim.keymap.set("n", "zr", "zrzz", { desc = "open fold and then center the cursorline" })
+
+vim.keymap.set("n", "zR", "zRzz", { desc = "open all folds and then center the cursorline" })
+
+vim.keymap.set("n", "zc", "zczz", { desc = "close fold and then center the cursorline" })
+
+vim.keymap.set("n", "zm", "zmzz", { desc = "close fold and then center the cursorline" })
+
+vim.keymap.set("n", "zM", "zMzz", { desc = "close all folds and then center the cursorline" })

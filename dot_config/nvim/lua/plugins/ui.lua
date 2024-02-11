@@ -29,7 +29,7 @@ return {
       { "anuvyklack/middleclass" },
       { "anuvyklack/animation.nvim", enabled = false },
     },
-    keys = { { "<leader>m", "<cmd>WindowsMaximize<cr>", desc = "Zoom" } },
+    keys = { { "<leader>cm", "<cmd>WindowsMaximize<cr>", desc = "Zoom" } },
     config = function()
       vim.o.winwidth = 5
       vim.o.equalalways = false
@@ -51,5 +51,12 @@ return {
       },
     },
     keys = { { "<leader>z", "<cmd>ZenMode<cr>", desc = "Zen Mode" } },
+  },
+  {
+    "shortcuts/no-neck-pain.nvim",
+    version = "*",
+    keys = {
+      { "<Leader>cn", ":NoNeckPain<CR>", desc = "NoNeckPain" },
+    },
   },
 }
