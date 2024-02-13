@@ -55,3 +55,5 @@ function reframeFocusedWindow()
 end
 
 hs.hotkey.bind(hyper, "F", reframeFocusedWindow)
+
+require("keyboard.yabai")
