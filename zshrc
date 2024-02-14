@@ -12,7 +12,6 @@ fi
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
-
 fpath=(~/.zsh/completions $fpath)
 autoload -U zmv
 autoload -U promptinit && promptinit
@@ -30,7 +29,6 @@ compinit -C
 
 export VISUAL=nvim
 export EDITOR=nvim
-# export PATH="$PATH:/usr/local/sbin:$DOTFILES/bin:$HOME/.local/bin"
 export PATH="/opt/homebrew/bin:$PATH" 
 export PATH="/usr/local/bin:$PATH"
 
@@ -41,7 +39,9 @@ eval "$(starship init zsh)"
 # bindkey -v
 bindkey '^?' backward-delete-char
 
-# ALIASES ---------------------------------------------------------------------
+#############################################################
+#                        ALIASES                            #
+#############################################################
 alias ta='tmux attach -t'
 
 alias l='exa -lah --git --all'
@@ -49,30 +49,74 @@ alias ll='exa -lh --git'
 alias ls=exa
 alias sl=exa
 alias lt='exa -lh --git --all --tree'
-alias find='fd'
+
 alias c='clear'
 alias s='source ~/.zshrc'
 alias trim="awk '{\$1=\$1;print}'"
-alias lg='lazygit'
 alias rm='rm -I'
-alias capslock='setxkbmap -option caps:escape'
+
 alias tzer='bash ~/.tmux/scripts/tmux-sessionizer.sh'
 alias wimg="wget -nd -H -p -A jpg,jpeg,png,gif -e robots=off "
+
+alias capslock='setxkbmap -option caps:escape'
 
 # Generate random password
 alias p="openssl rand -base64 32"
 
 alias ytmp3="yt-dlp -f 'ba' -x --audio-format mp3 -o '%(title)s.%(ext)s'"
 
+# Dirs
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias .....="cd ../../../.."
+alias ......="cd ../../../../.."
 
-# GIT ALIASES -----------------------------------------------------------------
-alias gc='git commit'
+take() {
+  mkdir -p "$1" && cd "$1"
+}
+
+# Dev
+alias p="pnpm"
+alias pd="pnpm dev"
+alias pb="pnpm build"
+alias ps="pnpm start"
+alias pt="pnpm test"
+
+alias op="open ."
+
+alias v="nvim"
+
+# HTTP requests with xh!
+alias http="xh"
+
+# notes
+alias nn="cd ~/notes && ./notes.sh"
+
+# navigation
+cx() { cd "$@" && l; }
+fcd() { cd "$(find . -type d -not -path '*/.*' | fzf)" && l; }
+f() { echo "$(find . -type f -not -path '*/.*' | fzf)" | pbcopy }
+fv() { nvim "$(find . -type f -not -path '*/.*' | fzf)" }
+
+# chezmoi
+alias dot="chezmoi cd"
+alias dot-add="chezmoi add"
+alias dot-apply="chezmoi -v apply"
+alias dot-diff="chezmoi diff"
+alias dot-edit="chezmoi edit"
+
+#############################################################
+#                       GIT ALIASES                         #
+#############################################################
+alias gc='git commit -m '
 alias gco='git checkout'
-alias ga='git add'
+alias ga='git add .'
+alias gst='git status'
 alias gb='git branch'
 alias gba='git branch --all'
 alias gcp='git cherry-pick'
-alias gpr='git remote prune origin'
+alias gp='git push'
 alias ff='gpr && git pull --ff-only'
 alias grd='git fetch origin && git rebase origin/master'
 alias gbb='git-switchbranch'
@@ -86,72 +130,7 @@ alias gec='git status | grep "both modified:" | cut -d ":" -f 2 | trim | xargs n
 alias gg='git branch | fzf | xargs git checkout'
 alias gup='git branch --set-upstream-to=origin/$(git-current-branch) $(git-current-branch)'
 
-copy-line () {
-  rg --line-number "${1:-.}" | fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | awk -F ':' '{print $3}' | sed 's/^\s+//' | pbcopy
-}
-
-open-at-line () {
-  vim $(rg --line-number "${1:-.}" | fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | awk -F ':' '{print "+"$2" "$1}')
-}
-
-### Docker
-
-alias unmount_all_and_exit='unmount_all && exit'
-alias d=docker
-alias dc=docker-compose
-alias dkill="pgrep \"Docker\" | xargs kill -9"
-
-dclear () {
-    docker ps -a -q | xargs docker kill -f
-    docker ps -a -q | xargs docker rm -f
-    docker images | grep "api\|none" | awk '{print $3}' | xargs docker rmi -f
-    docker volume prune -f
-}
-
-alias docker-clear=dclear
-
-dreset () {
-    dclear
-    docker images -q | xargs docker rmi -f
-    docker volume rm $(docker volume ls |awk '{print $2}')
-    rm -rf ~/Library/Containers/com.docker.docker/Data/*
-    docker system prune -a
-}
-
-# take() {
-#   mkdir -p "$1" && cd "$1"
-# }
-
-# tab completion
-setopt hash_list_all
-# https://stackoverflow.com/a/14900496/8514646
-bindkey '^i' expand-or-complete-prefix
-# by category
-# https://old.reddit.com/r/zsh/comments/6l797o/organizing_co mpletions_by_category/
-# https://github.com/sorinionescu/prezto/blob/master/modules/completion/init.zsh#L60
-zstyle ':completion:*:*:*:*:*' menu select
-zstyle ':completion:*:matches' group 'yes'
-zstyle ':completion:*:options' description 'yes'
-zstyle ':completion:*:options' auto-description '%d'
-zstyle ':completion:*:corrections' format ' %F{green}-- %d (errors: %e) --%f'
-zstyle ':completion:*:descriptions' format ' %F{yellow}-- %d --%f'
-zstyle ':completion:*:messages' format ' %F{purple} -- %d -- %f'
-zstyle ':completion:*:warnings' format ' %F{red}-- no matches found --%f'
-zstyle ':completion:*:default' list-prompt '%S%M matches%s'
-zstyle ':completion:*' format ' %F{yellow}-- %d --%f'
-zstyle ':completion:*' group-name ''
-zstyle ':completion:*' verbose yes
-
-eval "$(zoxide init zsh)"
-
-# Setting rg as the default source for fzf
-export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
-
-# To apply the command to CTRL-T as well
-export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-
-# dracula theme for FZF
-export FZF_DEFAULT_OPTS='--color=fg:#f8f8f2,bg:#282a36,hl:#bd93f9 --color=fg+:#f8f8f2,bg+:#44475a,hl+:#bd93f9 --color=info:#ffb86c,prompt:#50fa7b,pointer:#ff79c6 --color=marker:#ff79c6,spinner:#ffb86c,header:#6272a4'
+alias lg='lazygit'
 
 
 # Copied from Gary Bernhardt (destroyallsoftware.com) dot files repository.
@@ -225,6 +204,78 @@ git_page_maybe() {
     fi
 }
 
+copy-line () {
+  rg --line-number "${1:-.}" | fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | awk -F ':' '{print $3}' | sed 's/^\s+//' | pbcopy
+}
+
+open-at-line () {
+  vim $(rg --line-number "${1:-.}" | fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | awk -F ':' '{print "+"$2" "$1}')
+}
+
+#############################################################
+#                        DOCKER                             #
+#############################################################
+
+alias unmount_all_and_exit='unmount_all && exit'
+alias d=docker
+alias dc=docker-compose
+alias dkill="pgrep \"Docker\" | xargs kill -9"
+
+dclear () {
+    docker ps -a -q | xargs docker kill -f
+    docker ps -a -q | xargs docker rm -f
+    docker images | grep "api\|none" | awk '{print $3}' | xargs docker rmi -f
+    docker volume prune -f
+}
+
+alias docker-clear=dclear
+
+dreset () {
+    dclear
+    docker images -q | xargs docker rmi -f
+    docker volume rm $(docker volume ls |awk '{print $2}')
+    rm -rf ~/Library/Containers/com.docker.docker/Data/*
+    docker system prune -a
+}
+
+
+#############################################################
+#                        COMPLETION                         #
+#############################################################
+
+# tab completion
+setopt hash_list_all
+# https://stackoverflow.com/a/14900496/8514646
+bindkey '^i' expand-or-complete-prefix
+# by category
+# https://old.reddit.com/r/zsh/comments/6l797o/organizing_co mpletions_by_category/
+# https://github.com/sorinionescu/prezto/blob/master/modules/completion/init.zsh#L60
+zstyle ':completion:*:*:*:*:*' menu select
+zstyle ':completion:*:matches' group 'yes'
+zstyle ':completion:*:options' description 'yes'
+zstyle ':completion:*:options' auto-description '%d'
+zstyle ':completion:*:corrections' format ' %F{green}-- %d (errors: %e) --%f'
+zstyle ':completion:*:descriptions' format ' %F{yellow}-- %d --%f'
+zstyle ':completion:*:messages' format ' %F{purple} -- %d -- %f'
+zstyle ':completion:*:warnings' format ' %F{red}-- no matches found --%f'
+zstyle ':completion:*:default' list-prompt '%S%M matches%s'
+zstyle ':completion:*' format ' %F{yellow}-- %d --%f'
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' verbose yes
+
+eval "$(zoxide init zsh)"
+
+# Setting rg as the default source for fzf
+export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
+
+# To apply the command to CTRL-T as well
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+
+# dracula theme for FZF
+export FZF_DEFAULT_OPTS='--color=fg:#f8f8f2,bg:#282a36,hl:#bd93f9 --color=fg+:#f8f8f2,bg+:#44475a,hl+:#bd93f9 --color=info:#ffb86c,prompt:#50fa7b,pointer:#ff79c6 --color=marker:#ff79c6,spinner:#ffb86c,header:#6272a4'
+
+
+
 # https://github.com/robbyrussell/oh-my-zsh/blob/master/lib/history.zsh
 ## History wrapper
 function omz_history {
@@ -266,21 +317,6 @@ setopt hist_ignore_space      # ignore commands that start with space
 setopt hist_verify            # show command with history expansion to user before running it
 setopt inc_append_history     # add commands to HISTFILE in order of execution
 # setopt share_history          # share command history data
-
-
-# for mac - need timer and terminal-notifier
-# https://github.com/caarlos0/timer
-# https://github.com/julienXX/terminal-notifier
-
-alias work="timer 25m && terminal-notifier -message 'Pomodoro'\
-        -title 'Work Timer is up! Take a Break 😊'\
-        -appIcon '~/Pictures/pumpkin.png'\
-        -sound Crystal"
-        
-alias rest="timer 5m && terminal-notifier -message 'Pomodoro'\
-        -title 'Break is over! Get back to work 😬'\
-        -appIcon '~/Pictures/pumpkin.png'\
-        -sound Crystal"
 
 # lf icons
 export LF_ICONS="\
@@ -449,3 +485,5 @@ ex=:\
 source ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
 source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
+
+source /Users/yesh/.config/broot/launcher/bash/br
