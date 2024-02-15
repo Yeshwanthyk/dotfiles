@@ -6,8 +6,10 @@ return {
       { "<leader>om", mode = "n", desc = "Start Oatmeal session" },
     },
     opts = {
-      backend = "ollama",
-      model = "deepseek-coder:6.7b",
+      -- backend = "ollama",
+      -- model = "deepseek-coder:6.7b",
+      backend = "openai",
+      model = "gpt-3.5-turbo",
     },
   },
 

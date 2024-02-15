@@ -50,12 +50,14 @@ return {
   },
 
   -- better diffing
-  {
-    "sindrets/diffview.nvim",
-    cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewToggleFiles", "DiffviewFocusFiles" },
-    opts = {},
-    keys = { { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "DiffView" } },
-  },
+  -- {
+  --   "sindrets/diffview.nvim",
+  --   cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewToggleFiles", "DiffviewFocusFiles" },
+  --   opts = {},
+  --   keys = { { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "DiffView" } },
+  -- },
+
+  { "akinsho/git-conflict.nvim", version = "*", config = true },
 
   -- fugitive: Git blame and open in GitHub
   {
@@ -80,5 +82,13 @@ return {
       },
     },
     opts = { snippet_engine = "luasnip" },
+  },
+
+  {
+    "JellyApple102/flote.nvim",
+    config = true,
+    keys = {
+      { "<Leader>n", "<cmd>Flote<CR>", mode = { "n" }, noremap = true, desc = "open project note" },
+    },
   },
 }

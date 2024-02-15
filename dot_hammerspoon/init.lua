@@ -8,7 +8,7 @@ hyper = { "cmd", "alt", "ctrl", "shift" }
 -- hs.loadSpoon("MoveWindows"):start():bindHotKeys({ toggle = { hyper, "m" } })
 
 local HyperShortcuts = {
-	{ "A", "Alacritty" },
+	{ "A", "WezTerm" },
 	{ "T", "Things3" },
 	{ "L", "Logseq" },
 	{ "O", "Obsidian" },
@@ -19,13 +19,20 @@ local HyperShortcuts = {
 }
 
 -- Resize 50%
+-- https://github.com/jakubdyszkiewicz/dotfishy/blob/master/hammerspoon/init.lua
 hs.hotkey.bind(hyper, "[", function()
 	hs.grid.set(hs.window.focusedWindow(), "0,0 4x4")
 end)
 hs.hotkey.bind(hyper, "]", function()
 	hs.grid.set(hs.window.focusedWindow(), "4,0 4x4")
 end)
--- hs.hotkey.bind(hyper, "\\", hs.grid.maximizeWindow)
+hs.hotkey.bind(hyper, ";", function()
+	hs.grid.set(hs.window.focusedWindow(), "0,0 4x1")
+end)
+hs.hotkey.bind(hyper, "'", function()
+	hs.grid.set(hs.window.focusedWindow(), "0,2 4x1")
+end)
+hs.hotkey.bind(hyper, "\\", hs.grid.maximizeWindow)
 
 for _, shortcut in ipairs(HyperShortcuts) do
 	hs.hotkey.bind(hyper, shortcut[1], function()
@@ -67,7 +74,7 @@ function reframeFocusedWindow()
 end
 
 -- almost maximize
-hs.hotkey.bind(hyper, "\\", reframeFocusedWindow)
+-- hs.hotkey.bind(hyper, "\\", reframeFocusedWindow)
 
 -- Grid
 local padding = 15
