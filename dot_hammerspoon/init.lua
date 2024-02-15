@@ -1,3 +1,4 @@
+require("keyboard.layouts")
 hyper = { "cmd", "alt", "ctrl", "shift" }
 
 -- bind reload at start in case of error later in config
@@ -7,12 +8,14 @@ hs.hotkey.bind(hyper, "Y", hs.toggleConsole)
 hs.loadSpoon("MoveWindows"):start():bindHotKeys({ toggle = { hyper, "m" } })
 
 local HyperShortcuts = {
-	{ "A", "Alacritty" },
-	{ "S", "Google Chrome" },
-	{ "O", "Orion" },
-	{ "Q", "Spotify" },
+	{ "A", "Wezterm" },
+	{ "T", "Things3" },
 	{ "L", "Logseq" },
+	{ "O", "Obsidian" },
+	{ "Q", "Spotify" },
+	{ "S", "Google Chrome" },
 	{ "W", "Slack" },
+	{ "Y", "FreeTube" },
 }
 
 for _, shortcut in ipairs(HyperShortcuts) do
@@ -55,5 +58,13 @@ function reframeFocusedWindow()
 end
 
 hs.hotkey.bind(hyper, "F", reframeFocusedWindow)
+
+-- Grid
+hs.grid.setMargins(hs.geometry.size(0, 0))
+hs.grid.setGrid("8x2")
+
+hs.hotkey.bind(hyper, "g", function()
+	hs.grid.show()
+end)
 
 require("keyboard.yabai")
