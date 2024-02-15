@@ -32,6 +32,15 @@ export EDITOR=nvim
 export PATH="/opt/homebrew/bin:$PATH" 
 export PATH="/usr/local/bin:$PATH"
 
+# error with starship_zle-keymap-select-wrapped
+function zle-line-init zle-keymap-select {
+RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
+RPS2=$RPS1
+zle reset-prompt
+}
+zle -N zle-line-init
+zle -N zle-keymap-select
+
 
 eval "$(starship init zsh)"
 
