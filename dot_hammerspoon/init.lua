@@ -5,7 +5,7 @@ hyper = { "cmd", "alt", "ctrl", "shift" }
 hs.hotkey.bind(hyper, "R", hs.reload)
 hs.hotkey.bind(hyper, "Y", hs.toggleConsole)
 
-hs.loadSpoon("MoveWindows"):start():bindHotKeys({ toggle = { hyper, "m" } })
+-- hs.loadSpoon("MoveWindows"):start():bindHotKeys({ toggle = { hyper, "m" } })
 
 local HyperShortcuts = {
 	{ "A", "Wezterm" },
@@ -17,6 +17,15 @@ local HyperShortcuts = {
 	{ "W", "Slack" },
 	{ "Y", "FreeTube" },
 }
+
+-- Resize
+hs.hotkey.bind(hyper, "[", function()
+	hs.grid.set(hs.window.focusedWindow(), "0,0 4x4")
+end)
+hs.hotkey.bind(hyper, "]", function()
+	hs.grid.set(hs.window.focusedWindow(), "4,0 4x4")
+end)
+-- hs.hotkey.bind(hyper, "\\", hs.grid.maximizeWindow)
 
 for _, shortcut in ipairs(HyperShortcuts) do
 	hs.hotkey.bind(hyper, shortcut[1], function()
@@ -57,14 +66,15 @@ function reframeFocusedWindow()
 	win:setFrame(maximizedFrame)
 end
 
-hs.hotkey.bind(hyper, "F", reframeFocusedWindow)
+hs.hotkey.bind(hyper, "\\", reframeFocusedWindow)
 
 -- Grid
-hs.grid.setMargins(hs.geometry.size(0, 0))
+local padding = 15
+hs.grid.setMargins(hs.geometry.size(padding, padding))
 hs.grid.setGrid("8x2")
 
-hs.hotkey.bind(hyper, "g", function()
-	hs.grid.show()
-end)
+-- hs.hotkey.bind(hyper, "g", function()
+-- 	hs.grid.show()
+-- end)
 
-require("keyboard.yabai")
+-- require("keyboard.yabai")
