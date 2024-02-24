@@ -13,3 +13,7 @@ vim.opt_local.clipboard = ""
 vim.cmd([[
   au BufReadPost * if expand('%:p') !~# '\m/\.git/' && line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 ]])
+
+vim.g.codeium_filetypes = {
+  markdown = false,
+}

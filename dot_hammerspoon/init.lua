@@ -8,7 +8,7 @@ hyper = { "cmd", "alt", "ctrl", "shift" }
 -- hs.loadSpoon("MoveWindows"):start():bindHotKeys({ toggle = { hyper, "m" } })
 
 local HyperShortcuts = {
-	{ "A", "WezTerm" },
+	{ "A", "Kitty" },
 	{ "T", "Things3" },
 	{ "L", "Logseq" },
 	{ "O", "Obsidian" },

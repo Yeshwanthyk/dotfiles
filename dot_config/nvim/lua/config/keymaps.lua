@@ -9,7 +9,7 @@ vim.keymap.set("n", "<Space>", "<C-w>w")
 vim.api.nvim_set_keymap("t", "<Esc>", "<C-\\><C-n>", { noremap = true })
 
 -- Oil
-vim.keymap.set("n", "<leader>e", "<cmd>lua require('oil').toggle_float()<CR>", { desc = "Oil" })
+vim.keymap.set("n", "<leader>r", "<cmd>lua require('oil').toggle_float()<CR>", { desc = "Oil" })
 
 -- Twilight
 vim.keymap.set("n", "<leader>tt", "<cmd>Twilight<CR>", { desc = "Toggle Twilight" })
@@ -54,18 +54,14 @@ vim.keymap.set("i", "kj", "<Esc>")
 vim.api.nvim_create_user_command("W", "w", { nargs = 0 })
 vim.api.nvim_create_user_command("Q", "q", { nargs = 0 })
 
-vim.keymap.set("n", "<C-d>", "<C-d>zz", { desc = "scroll down and then center the cursorline" })
-
-vim.keymap.set("n", "<C-u>", "<C-u>zz", { desc = "scroll up and then center the cursorline" })
-
-vim.keymap.set("n", "zo", "zozz", { desc = "open fold and then center the cursorline" })
-
 vim.keymap.set("n", "zr", "zrzz", { desc = "open fold and then center the cursorline" })
-
 vim.keymap.set("n", "zR", "zRzz", { desc = "open all folds and then center the cursorline" })
-
 vim.keymap.set("n", "zc", "zczz", { desc = "close fold and then center the cursorline" })
-
 vim.keymap.set("n", "zm", "zmzz", { desc = "close fold and then center the cursorline" })
-
 vim.keymap.set("n", "zM", "zMzz", { desc = "close all folds and then center the cursorline" })
+
+vim.keymap.set("n", "<leader>of", "<Cmd>ObsidianQuickSwitch<CR>")
+vim.keymap.set("n", "<leader>os", "<Cmd>ObsidianSearch<CR>")
+vim.keymap.set("n", "<leader>od", "<Cmd>ObsidianToday<CR>")
+vim.keymap.set("n", "<leader>ob", "<Cmd>ObsidianBacklinks<CR>")
+vim.keymap.set("n", "<leader>ol", "<Cmd>ObsidianFollowLink<CR>")
