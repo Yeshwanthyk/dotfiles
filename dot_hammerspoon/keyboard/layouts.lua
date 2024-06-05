@@ -18,16 +18,16 @@ defineLayout("Work", 1, {
 })
 
 defineLayout("Code", 2, {
-	{ "Kitty", "0,0 6x2" },
-	{ "Google Chrome", "6,0 2x2", true },
+	{ "iTerm", "0,0 6x2" },
+	{ "Arc", "6,0 2x2", true },
 })
 
 defineLayout("Writing", 3, {
-	{ "Kitty", "0,0 4x2" },
+	{ "iTerm", "0,0 4x2" },
 	{ "Obsidian", "4,0 4x2", true },
 })
 defineLayout("Lc", 4, {
-	{ "Kitty", "0,0 6x2" },
+	{ "iTerm", "0,0 6x2" },
 	{ "Orion", "6,0 2x2", true },
 })
 
