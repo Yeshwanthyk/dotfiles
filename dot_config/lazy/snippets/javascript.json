@@ -1,0 +1,31 @@
+{
+  "CLO": {
+    "body": "console.log('${1:object} :>> ', ${1:object});",
+    "prefix": "clo"
+  },
+  "Exfn": {
+    "body": [
+      "export const $0 = async (req, res) => {",
+      "  try {",
+      "    res.status(200).json({ok: true});",
+      "  } catch (e) {",
+      "    console.error(e);",
+      "    res.status(400).json({ error: e.codeName });",
+      "  }",
+      "};"
+    ],
+    "prefix": "Exfn"
+  },
+  "afn": {
+    "body": "const ${1:name} = (${2:params}) => {${3}}",
+    "prefix": "afn"
+  },
+  "fof": {
+    "body": "for (const ${1:item} of ${2:object}) {\\n\\t${0}\\n}",
+    "prefix": "fof"
+  },
+  "imp": {
+    "body": "import ${2:moduleName} from '${1:module}';$0",
+    "prefix": "imp"
+  }
+}
