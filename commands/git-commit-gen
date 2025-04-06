@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Function to copy text to clipboard (cross-platform)
+copy_to_clipboard() {
+  if command -v pbcopy >/dev/null; then
+    echo "$1" | pbcopy
+  elif command -v xclip >/dev/null; then
+    echo "$1" | xclip -selection clipboard
+  elif command -v clip >/dev/null; then
+    echo "$1" | clip
+  else
+    echo "No clipboard utility found (install xclip, pbcopy, or clip)."
+    return 1
+  fi
+  echo "Commit message copied to clipboard!"
+}
+
+# Get the diff of staged files
+DIFF=$(git diff --cached)
+
+# Check if there’s anything staged
+if [ -z "$DIFF" ]; then
+  echo "No staged changes found. Stage some files with 'git add' first."
+  exit 1
+fi
+
+# Check if OPENROUTER_API_KEY is set
+if [ -z "$OPENROUTER_API_KEY" ]; then
+  echo "Error: OPENROUTER_API_KEY environment variable is not set."
+  exit 1
+fi
+API_KEY="$OPENROUTER_API_KEY"
+
+# OpenRouter API endpoint
+API_URL="https://openrouter.ai/api/v1/chat/completions"
+
+# Prepare the prompt for OpenRouter
+PROMPT="Generate a concise Git commit message based on this diff using Conventional Commits. Do not use backticks, Markdown, or any formatting—just plain text:\n\n$DIFF"
+
+# Escape the prompt for JSON to handle special characters
+JSON_PROMPT=$(printf '%s' "$PROMPT" | jq -R -s '.')
+
+# Send the diff to OpenRouter and get the commit message
+RAW_RESPONSE=$(curl -s -X POST "$API_URL" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"model\": \"google/gemini-2.5-pro-exp-03-25:free\", \"messages\": [{\"role\": \"user\", \"content\": $JSON_PROMPT}]}")
+
+# Print raw response for debugging
+echo "Raw API response:"
+echo "$RAW_RESPONSE"
+
+# Extract commit message
+COMMIT_MESSAGE=$(echo "$RAW_RESPONSE" | jq -r '.choices[0].message.content')
+
+# Check if OpenRouter returned a valid response
+if [ -z "$COMMIT_MESSAGE" ] || [ "$COMMIT_MESSAGE" = "null" ]; then
+  echo "Failed to generate a commit message from OpenRouter."
+  echo "Check your API key, network, or model availability."
+  exit 1
+fi
+
+# Strip any backticks or Markdown formatting (just in case)
+CLEANED_COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | sed 's/```//g' | sed 's/`//g' | tr -d '\n')
+
+# Display the generated commit message
+echo "Generated commit message:"
+echo "$CLEANED_COMMIT_MESSAGE"
