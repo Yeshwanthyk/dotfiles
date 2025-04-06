@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Function to copy text to clipboard (cross-platform)
+copy_to_clipboard() {
+  if command -v pbcopy >/dev/null; then
+    echo -e "$1" | pbcopy
+  elif command -v xclip >/dev/null; then
+    echo -e "$1" | xclip -selection clipboard
+  elif command -v clip >/dev/null; then
+    echo -e "$1" | clip
+  else
+    echo "No clipboard utility found (install xclip, pbcopy, or clip)."
+    return 1
+  fi
+  echo "Markdown copied to clipboard!"
+}
+
+# Check if a branch name is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <branch-to-compare>"
+  echo "Example: $0 main"
+  exit 1
+fi
+COMPARE_BRANCH="$1"
+
+# Verify the branch exists
+if ! git show-ref --verify --quiet "refs/heads/$COMPARE_BRANCH"; then
+  echo "Error: Branch '$COMPARE_BRANCH' does not exist."
+  exit 1
+fi
+
+# Get the current branch name
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Get the diff between current branch and the specified branch
+DIFF=$(git diff "$COMPARE_BRANCH" "$CURRENT_BRANCH")
+
+# Check if there’s any difference
+if [ -z "$DIFF" ]; then
+  echo "No differences found between $CURRENT_BRANCH and $COMPARE_BRANCH."
+  exit 1
+fi
+
+# Check if OPENROUTER_API_KEY is set
+if [ -z "$OPENROUTER_API_KEY" ]; then
+  echo "Error: OPENROUTER_API_KEY environment variable is not set."
+  exit 1
+fi
+API_KEY="$OPENROUTER_API_KEY"
+
+# OpenRouter API endpoint
+API_URL="https://openrouter.ai/api/v1/chat/completions"
+
+# Prepare the prompt for OpenRouter
+PROMPT="Based on this git diff between branch '$COMPARE_BRANCH' and '$CURRENT_BRANCH', generate a Title and Description. The Title must be plain text in Conventional Commits style (e.g., 'feat(scope): description', no Markdown). The Description must be in Markdown with exactly two sections: '## Overview' and '## Changes'. The '## Overview' section must contain at least one sentence summarizing the purpose of the changes. The '## Changes' section must list specific modifications in bullet points (using '- '). Do not include extra Markdown code blocks (e.g., \`\`\`markdown). Return them in this format:\nTitle: <title>\nDescription:\n## Overview\n<summary>\n## Changes\n- <change1>\n- <change2>\n\nHere’s the diff:\n\n$DIFF"
+
+# Escape the prompt for JSON to handle special characters
+JSON_PROMPT=$(printf '%s' "$PROMPT" | jq -R -s '.')
+
+# Send the diff to OpenRouter and get the response
+RAW_RESPONSE=$(curl -s -X POST "$API_URL" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"model\": \"google/gemini-2.5-pro-exp-03-25:free\", \"messages\": [{\"role\": \"user\", \"content\": $JSON_PROMPT}]}")
+
+# Extract the full response content
+FULL_RESPONSE=$(echo "$RAW_RESPONSE" | jq -r '.choices[0].message.content')
+
+# Check if OpenRouter returned a valid response
+if [ -z "$FULL_RESPONSE" ] || [ "$FULL_RESPONSE" = "null" ]; then
+  echo "Failed to generate a response from OpenRouter."
+  echo "Check your API key, network, or model availability."
+  exit 1
+fi
+
+# Parse Title and Description from the response
+TITLE=$(echo "$FULL_RESPONSE" | sed -n '/^Title: /p' | sed 's/^Title: //')
+DESCRIPTION=$(echo "$FULL_RESPONSE" | sed -n '/^Description:/,/^$/p' | sed 's/^Description://' | sed '/^$/d')
+
+# Check if both Title and Description were extracted
+if [ -z "$TITLE" ] || [ -z "$DESCRIPTION" ]; then
+  echo "Failed to parse Title or Description from the response."
+  echo "Full response was:"
+  echo "$FULL_RESPONSE"
+  exit 1
+fi
+
+# Format as Markdown for GitHub
+MARKDOWN=$(
+  cat <<EOF
+# $TITLE
+
+$DESCRIPTION
+EOF
+)
+
+# Display the formatted Markdown
+echo -e "\nGenerated Markdown for GitHub:"
+echo -e "$MARKDOWN"
+
+# Copy to clipboard
+copy_to_clipboard "$MARKDOWN"

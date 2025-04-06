@@ -1,0 +1,182 @@
+#!/bin/bash
+
+# promptlib - A simple prompt library manager
+# Usage: promptlib [add|edit|list|remove]
+
+PROMPT_DIR="$HOME/.promptlib"
+CLIPBOARD_CMD="pbcopy" # macOS clipboard command
+
+# Create prompt directory if it doesn't exist
+if [ ! -d "$PROMPT_DIR" ]; then
+    mkdir -p "$PROMPT_DIR"
+    echo "Created prompt library directory at $PROMPT_DIR"
+fi
+
+list_prompts() {
+    echo "Available prompts:"
+    local count=1
+    for prompt in "$PROMPT_DIR"/*; do
+        if [ -f "$prompt" ]; then
+            echo "$count) $(basename "$prompt")"
+            count=$((count + 1))
+        fi
+    done
+}
+
+copy_prompt() {
+    local prompts=("$PROMPT_DIR"/*)
+    local num_prompts=${#prompts[@]}
+    
+    if [ $num_prompts -eq 0 ]; then
+        echo "No prompts found. Add some with 'promptlib add <name>'"
+        exit 1
+    fi
+    
+    local selection
+    
+    if [ -z "$1" ]; then
+        list_prompts
+        echo -n "Select prompt number: "
+        read selection
+    else
+        selection=$1
+    fi
+    
+    if ! [[ "$selection" =~ ^[0-9]+$ ]]; then
+        echo "Please enter a valid number."
+        exit 1
+    fi
+    
+    if [ "$selection" -lt 1 ] || [ "$selection" -gt $num_prompts ]; then
+        echo "Selection out of range."
+        exit 1
+    fi
+    
+    local selected_prompt="${prompts[$((selection-1))]}"
+    cat "$selected_prompt" | $CLIPBOARD_CMD
+    echo "Copied '$(basename "$selected_prompt")' to clipboard!"
+}
+
+add_prompt() {
+    if [ -z "$1" ]; then
+        echo "Please provide a name for the prompt."
+        exit 1
+    fi
+    
+    local prompt_name="$1"
+    local prompt_file="$PROMPT_DIR/$prompt_name"
+    
+    if [ -f "$prompt_file" ]; then
+        echo "Prompt '$prompt_name' already exists. Use 'promptlib edit $prompt_name' to modify it."
+        exit 1
+    fi
+    
+    ${EDITOR:-vim} "$prompt_file"
+    echo "Prompt '$prompt_name' created."
+}
+
+edit_prompt() {
+    local prompts=("$PROMPT_DIR"/*)
+    local num_prompts=${#prompts[@]}
+    
+    if [ $num_prompts -eq 0 ]; then
+        echo "No prompts found. Add some with 'promptlib add <name>'"
+        exit 1
+    fi
+    
+    local selection
+    
+    if [ -z "$1" ]; then
+        list_prompts
+        echo -n "Select prompt to edit (number): "
+        read selection
+        
+        if ! [[ "$selection" =~ ^[0-9]+$ ]]; then
+            echo "Please enter a valid number."
+            exit 1
+        fi
+        
+        if [ "$selection" -lt 1 ] || [ "$selection" -gt $num_prompts ]; then
+            echo "Selection out of range."
+            exit 1
+        fi
+        
+        ${EDITOR:-vim} "${prompts[$((selection-1))]}"
+    else
+        local prompt_file="$PROMPT_DIR/$1"
+        
+        if [ ! -f "$prompt_file" ]; then
+            echo "Prompt '$1' not found."
+            exit 1
+        fi
+        
+        ${EDITOR:-vim} "$prompt_file"
+    fi
+    
+    echo "Prompt updated."
+}
+
+remove_prompt() {
+    local prompts=("$PROMPT_DIR"/*)
+    local num_prompts=${#prompts[@]}
+    
+    if [ $num_prompts -eq 0 ]; then
+        echo "No prompts found."
+        exit 1
+    fi
+    
+    local selection
+    
+    if [ -z "$1" ]; then
+        list_prompts
+        echo -n "Select prompt to remove (number): "
+        read selection
+        
+        if ! [[ "$selection" =~ ^[0-9]+$ ]]; then
+            echo "Please enter a valid number."
+            exit 1
+        fi
+        
+        if [ "$selection" -lt 1 ] || [ "$selection" -gt $num_prompts ]; then
+            echo "Selection out of range."
+            exit 1
+        fi
+        
+        local selected_prompt="${prompts[$((selection-1))]}"
+        rm "$selected_prompt"
+        echo "Removed '$(basename "$selected_prompt")'."
+    else
+        local prompt_file="$PROMPT_DIR/$1"
+        
+        if [ ! -f "$prompt_file" ]; then
+            echo "Prompt '$1' not found."
+            exit 1
+        fi
+        
+        rm "$prompt_file"
+        echo "Removed '$1'."
+    fi
+}
+
+# Main command router
+case "$1" in
+    "add")
+        add_prompt "$2"
+        ;;
+    "edit")
+        edit_prompt "$2"
+        ;;
+    "remove")
+        remove_prompt "$2"
+        ;;
+    "list")
+        list_prompts
+        ;;
+    *)
+        if [ -n "$1" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
+            copy_prompt "$1"
+        else
+            copy_prompt
+        fi
+        ;;
+esac

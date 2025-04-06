@@ -1,0 +1,413 @@
+#!/bin/bash
+# codebundle.sh - A script to concatenate or slice code files with markdown formatting
+# Converted from Python version to Bash
+#
+# Prompt:
+# Provide the full contents of every modified file in a code fence, with the relative filepath in the format ### **`filepath`** above each fence, ensuring all original code (including unchanged sections) is included, and for long files, break them into logical sections with `.1`, `.2`, etc., without omitting any content.
+
+# ----- Global variables -----
+OUTPUT=""
+FORCE=false
+SLICE_MODE=false
+ADD_PROMPT=false
+INCLUDES=()
+EXCLUDES=()
+
+# ----- AI Instruction Prompt -----
+AI_INSTRUCTION_PROMPT='
+> **AI Instruction:**
+> The following code represents a software project, with each file presented below its corresponding path header.
+>
+> Please adhere strictly to the following format when generating responses or modifications:
+> 1.  Use a header line exactly like `### **\`path/to/file.ext\`**` before each file'\''s content. Replace `path/to/file.ext` with the actual relative path.
+> 2.  Enclose all code blocks within triple backticks (```) specifying the language identifier (e.g., ```python, ```javascript, ```html, etc.). If the language is unknown or plain text, you can omit it or use ```text.
+>
+> Maintaining this exact structure is crucial for parsing your response correctly. Thank you!
+'
+
+# ----- Portable relative path resolver -----
+relpath() {
+  local target="$1"
+  local base="$2"
+  if [ -z "${_HAS_GNU_REALPATH+x}" ]; then
+    if realpath --help 2>&1 | grep -q -- '--relative-to'; then
+      _HAS_GNU_REALPATH=1
+    else
+      _HAS_GNU_REALPATH=0
+    fi
+  fi
+  if [ "$_HAS_GNU_REALPATH" -eq 1 ]; then
+    realpath --relative-to="$base" "$target"
+  else
+    python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$target" "$base" 2>/dev/null || {
+      abs_target=$(cd "$(dirname "$target")" && pwd)/$(basename "$target")
+      echo "$abs_target"
+    }
+  fi
+}
+
+# ----- Code fence language lookup -----
+get_language() {
+  local ext=$(echo "$1" | grep -o '\.[^.]*$' | tr '[:upper:]' '[:lower:]')
+  case "$ext" in
+  ".py") echo "python" ;;
+  ".js") echo "javascript" ;;
+  ".html") echo "html" ;;
+  ".css") echo "css" ;;
+  ".sh") echo "bash" ;;
+  ".java") echo "java" ;;
+  ".cpp") echo "c++" ;;
+  ".c") echo "c" ;;
+  ".json") echo "json" ;;
+  ".yml" | ".yaml") echo "yaml" ;;
+  ".xml") echo "xml" ;;
+  ".rb") echo "ruby" ;;
+  ".rs") echo "rust" ;;
+  ".go") echo "go" ;;
+  ".md") echo "markdown" ;;
+  ".txt") echo "text" ;;
+  ".ini" | ".cfg") echo "ini" ;;
+  *) echo "text" ;;
+  esac
+}
+
+# ----- Error handling -----
+handle_error() {
+  echo "Error: $1" >&2
+  exit 1
+}
+
+# ----- Check if a file is a text file -----
+is_text_file() {
+  local file="$1"
+  local ext=$(echo "$file" | grep -o '\.[^.]*$' | tr '[:upper:]' '[:lower:]')
+  # If explicitly included, trust user intent and treat as text
+  local relpath_includes=false
+  for pattern in "${INCLUDES[@]}"; do
+    if [[ "$file" == $pattern || $(basename "$file") == $pattern ]]; then
+      relpath_includes=true
+      break
+    fi
+  done
+  if [[ "$relpath_includes" == true ]]; then
+    return 0
+  fi
+  local binary_exts=(".jpg" ".jpeg" ".png" ".gif" ".bmp" ".tiff" ".ico"
+    ".mp3" ".wav" ".ogg" ".flac" ".aac"
+    ".mp4" ".avi" ".mov" ".mkv" ".webm"
+    ".zip" ".rar" ".7z" ".tar" ".gz" ".bz2" ".xz"
+    ".exe" ".dll" ".so" ".o" ".pyc" ".pyd"
+    ".class" ".jar" ".war"
+    ".pdf" ".doc" ".docx" ".xls" ".xlsx" ".ppt" ".pptx"
+    ".db" ".sqlite" ".sqlite3"
+    ".woff" ".woff2" ".ttf" ".otf" ".eot")
+  for bin_ext in "${binary_exts[@]}"; do
+    if [[ "$ext" == "$bin_ext" ]]; then
+      return 1
+    fi
+  done
+  if file -b --mime-type "$file" | grep -q "^text/" || file -b "$file" | grep -q "text"; then
+    return 0
+  else
+    if hexdump -n 1000 -C "$file" | grep -q "00 "; then
+      return 1
+    fi
+    return 1
+  fi
+}
+
+# ----- Check if a path should be excluded -----
+should_exclude() {
+  local path="$1"
+  local is_dir="$2"
+  local basename=$(basename "$path")
+  if [[ "$is_dir" == "true" ]]; then
+    path_with_slash="$path/"
+  else
+    path_with_slash="$path"
+  fi
+  for pattern in "${EXCLUDES[@]}"; do
+    if [[ "$path" == $pattern || "$basename" == $pattern || "$path_with_slash" == $pattern ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# ----- Check if a path should be included -----
+should_include() {
+  local path="$1"
+  local basename=$(basename "$path")
+  if [[ ${#INCLUDES[@]} -eq 0 ]]; then
+    return 0
+  fi
+  for pattern in "${INCLUDES[@]}"; do
+    if [[ "$path" == $pattern || "$basename" == $pattern ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# ----- Write file to output with markdown formatting -----
+write_file_to_output() {
+  local file_path="$1"
+  local base_folder="$2"
+  local output_file="$3"
+  local rel_path=$(relpath "$file_path" "$base_folder")
+  local language=$(get_language "$file_path")
+  local content
+  if ! content=$(cat "$file_path" 2>/dev/null); then
+    echo "  Warning: Unable to read $file_path. Skipping file."
+    return
+  fi
+  echo "### **\`$rel_path\`**" >>"$output_file"
+  echo "" >>"$output_file"
+  echo "\`\`\`$language" >>"$output_file"
+  echo "$content" >>"$output_file"
+  echo "\`\`\`" >>"$output_file"
+  echo "" >>"$output_file"
+}
+
+# ----- Traverse and concatenate files -----
+traverse_and_concatenate() {
+  local current_path="$1"
+  local base_folder="$2"
+  local output_file="$3"
+  local processed_count=0
+  local skipped_count=0
+  local excluded_count=0
+  if [[ -d "$current_path" ]]; then
+    is_dir="true"
+  else
+    is_dir="false"
+  fi
+  local rel_path=$(relpath "$current_path" "$base_folder")
+  if should_exclude "$current_path" "$is_dir"; then
+    echo "  Excluding: $rel_path$(if [[ "$is_dir" == "true" ]]; then echo "/"; fi)"
+    ((excluded_count++))
+    return
+  fi
+  if ! should_include "$current_path" "$is_dir"; then
+    if [[ -d "$current_path" ]]; then
+      for item in "$current_path"/*; do
+        if [[ -e "$item" ]]; then
+          traverse_and_concatenate "$item" "$base_folder" "$output_file"
+        fi
+      done
+    fi
+    return
+  fi
+  if [[ -d "$current_path" ]]; then
+    echo "  Entering: $rel_path/"
+    for item in "$current_path"/*; do
+      if [[ -e "$item" ]]; then
+        traverse_and_concatenate "$item" "$base_folder" "$output_file"
+      fi
+    done
+  elif [[ -f "$current_path" ]]; then
+    if is_text_file "$current_path"; then
+      echo "  Adding:   $rel_path"
+      write_file_to_output "$current_path" "$base_folder" "$output_file"
+      ((processed_count++))
+    else
+      echo "  Skipping (non-text): $rel_path"
+      ((skipped_count++))
+    fi
+  fi
+}
+
+# ----- Concatenate files and folders -----
+concatenate_files_and_folders() {
+  local output_name="$1"
+  shift
+  local paths=("$@")
+  local processed_count=0
+  local skipped_count=0
+  local excluded_count=0
+  if [[ -f "$output_name" && "$FORCE" != "true" ]]; then
+    handle_error "Output file '$output_name' already exists. Use -f or --force to overwrite."
+  elif [[ -f "$output_name" && "$FORCE" == "true" ]]; then
+    echo "Overwriting existing file: $output_name"
+  fi
+  if [[ ${#EXCLUDES[@]} -eq 0 ]]; then
+    EXCLUDES=("venv" ".venv" "**/site-packages" "__pycache__" "*.pyc" ".git" ".hg" ".svn" "node_modules" ".DS_Store")
+  fi
+  >"$output_name"
+  if [[ "$ADD_PROMPT" == "true" ]]; then
+    echo "  Adding AI instruction prompt..."
+    echo "$AI_INSTRUCTION_PROMPT" >>"$output_name"
+    echo "" >>"$output_name"
+  fi
+  for path_arg in "${paths[@]}"; do
+    if [[ ! -e "$path_arg" ]]; then
+      echo "Warning: Input path '$path_arg' does not exist. Skipping."
+      continue
+    fi
+    if [[ -f "$path_arg" ]]; then
+      base_folder_for_relpath=$(dirname "$path_arg")
+      if [[ -z "$base_folder_for_relpath" ]]; then
+        base_folder_for_relpath="."
+      fi
+    else
+      base_folder_for_relpath="$path_arg"
+    fi
+    traverse_and_concatenate "$path_arg" "$base_folder_for_relpath" "$output_name"
+  done
+  echo -e "\nConcatenation complete."
+  echo -e "\nSummary:"
+  echo "  Output file: $output_name"
+}
+
+# ----- Slice files -----
+slice_files() {
+  local output_folder="$1"
+  shift
+  local input_files=("$@")
+  local files_created=0
+  local errors_encountered=0
+  echo "Slicing files: ${input_files[*]}"
+  echo "Output folder: $output_folder"
+  if [[ ! -d "$output_folder" ]]; then
+    mkdir -p "$output_folder" || handle_error "Could not create output folder '$output_folder'"
+    echo "Created output folder: $output_folder"
+  fi
+  for input_file in "${input_files[@]}"; do
+    if [[ ! -f "$input_file" ]]; then
+      echo "Warning: Input file '$input_file' not found. Skipping."
+      ((errors_encountered++))
+      continue
+    fi
+    echo "Processing '$input_file'..."
+    if grep -q "**AI Instruction:**" "$input_file"; then
+      echo "  Found AI instruction prompt, will skip when parsing."
+    fi
+    TEMP_DIR=$(mktemp -d)
+    grep -n "^### \*\*\`" "$input_file" | while read -r line_info; do
+      line_num=$(echo "$line_info" | cut -d: -f1)
+      file_path=$(echo "$line_info" | sed -E 's/^[0-9]+:### \*\*`([^`]+)`\*\*.*/\1/')
+      file_path=$(echo "$file_path" | sed 's/^\///')
+      if echo "$file_path" | grep -q "\.\."; then
+        echo "  Security Warning: Skipping potentially unsafe path '$file_path'"
+        ((errors_encountered++))
+        continue
+      fi
+      next_marker=$(grep -n "^### \*\*\`" "$input_file" | awk -v line="$line_num" '$1 > line {print $1; exit}')
+      if [[ -z "$next_marker" ]]; then
+        next_marker=$(wc -l <"$input_file")
+      else
+        next_marker=$((next_marker - 1))
+      fi
+      sed -n "$line_num,$next_marker p" "$input_file" >"$TEMP_DIR/section.tmp"
+      content=$(sed -n '/^```/,/^```/ p' "$TEMP_DIR/section.tmp" | sed '1d;$d')
+      mkdir -p "$output_folder/$(dirname "$file_path")"
+      echo "$content" >"$output_folder/$file_path"
+      echo "  Creating file: $output_folder/$file_path"
+      ((files_created++))
+    done
+    rm -rf "$TEMP_DIR"
+  done
+  echo -e "\nSlicing complete."
+  echo "  Files created: $files_created"
+  if [[ $errors_encountered -gt 0 ]]; then
+    echo "  Errors encountered: $errors_encountered"
+  fi
+}
+
+# ----- Display usage information -----
+show_usage() {
+  cat <<EOF
+Usage: $(basename "$0") [options] output paths...
+Concatenate (bundle) or slice (unbundle) text files from project structures into/from a single Markdown file.
+Options:
+-f, --force        Concatenate mode: Overwrite the output file if it exists.
+-s, --slice        Run in slice mode: Recreate files/folders from the input Markdown file(s).
+-x, --exclude      Exclude files or folders matching the given pattern (glob-style).
+                   Can be used multiple times. Defaults include common patterns.
+-i, --include      Include only files or folders matching the given pattern (glob-style).
+                   If used, only items matching these patterns will be considered.
+-p, --add-prompt   Concatenate mode: Add an instruction prompt for AI at the beginning of the output file.
+-h, --help         Show this help message.
+EOF
+}
+
+# ----- Parse command line arguments -----
+parse_arguments() {
+  EXCLUDES=("venv" ".venv" "**/site-packages" "__pycache__" "*.pyc" ".git" ".hg" ".svn" "node_modules" ".DS_Store")
+  if [[ $# -eq 0 ]]; then
+    show_usage
+    exit 1
+  fi
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -f | --force)
+      FORCE=true
+      shift
+      ;;
+    -s | --slice)
+      SLICE_MODE=true
+      shift
+      ;;
+    -x | --exclude)
+      if [[ -z "$2" || "$2" == -* ]]; then
+        handle_error "Exclude pattern missing after $1"
+      fi
+      EXCLUDES+=("$2")
+      shift 2
+      ;;
+    -i | --include)
+      if [[ -z "$2" || "$2" == -* ]]; then
+        handle_error "Include pattern missing after $1"
+      fi
+      INCLUDES+=("$2")
+      shift 2
+      ;;
+    -p | --add-prompt)
+      ADD_PROMPT=true
+      shift
+      ;;
+    -h | --help)
+      show_usage
+      exit 0
+      ;;
+    -*)
+      handle_error "Unknown option: $1"
+      ;;
+    *)
+      if [[ -z "$OUTPUT" ]]; then
+        OUTPUT="$1"
+        shift
+      else
+        break
+      fi
+      ;;
+    esac
+  done
+  PATHS=("$@")
+  if [[ -z "$OUTPUT" ]]; then
+    handle_error "No output specified"
+  fi
+  if [[ ${#PATHS[@]} -eq 0 ]]; then
+    handle_error "No input paths specified"
+  fi
+  if [[ "$SLICE_MODE" == "true" && "$ADD_PROMPT" == "true" ]]; then
+    handle_error "--add-prompt is only valid in concatenate mode."
+  fi
+  if [[ "$SLICE_MODE" == "true" && "$FORCE" == "true" ]]; then
+    echo "Warning: --force has no effect in slice mode."
+  fi
+}
+
+# ----- Main function -----
+main() {
+  parse_arguments "$@"
+  if [[ "$SLICE_MODE" == "true" ]]; then
+    echo "Running in slice mode..."
+    slice_files "$OUTPUT" "${PATHS[@]}"
+  else
+    echo "Running in concatenate mode..."
+    concatenate_files_and_folders "$OUTPUT" "${PATHS[@]}"
+  fi
+}
+
+main "$@"
