@@ -1,0 +1,33 @@
+# Earl Grey theme for Ghostty
+# Converted from https://github.com/jacksonludwig/vim-earl-grey
+
+# Basic colors
+background = #FCFBF9
+foreground = #605A52
+
+# Cursor
+cursor-color = #605A52
+cursor-text = #FCFBF9
+
+# Selection
+selection-background = #CBD2E1
+selection-foreground = #605A52
+
+# Color palette (16 colors)
+palette = 0=#FCFBF9
+palette = 1=#8F5652
+palette = 2=#747B4D
+palette = 3=#886A44
+palette = 4=#556995
+palette = 5=#83577D
+palette = 6=#477A7B
+palette = 7=#605A52
+
+palette = 8=#9C958B
+palette = 9=#8F5652
+palette = 10=#747B4D
+palette = 11=#886A44
+palette = 12=#6A7EA9
+palette = 13=#83577D
+palette = 14=#477A7B
+palette = 15=#605A52
