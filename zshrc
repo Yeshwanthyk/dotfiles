@@ -1,124 +1,162 @@
-source_if_exists () {
-    if test -r "$1"; then
-        source "$1"
-    fi
+###############################################################################
+#                                .zshrc FILE                                #
+###############################################################################
+# This file contains your shell configuration. It is organized into sections
+# for sourcing external files, environment variables, key bindings, aliases,
+# functions, plugins, and more.
+
+###############################################################################
+# FUNCTIONS
+###############################################################################
+# Source a file if it exists and is readable.
+source_if_exists() {
+  if [[ -r "$1" ]]; then
+    source "$1"
+  fi
 }
 
-source_if_exists ~/.fzf.zsh
 
-if type "direnv" > /dev/null; then
-    eval "$(direnv hook zsh)"
+if [ -f ~/.env ]; then
+    source ~/.env
 fi
 
+###############################################################################
+# EXTERNAL SCRIPTS & TOOLS
+###############################################################################
+# fzf configuration (if available)
+source_if_exists ~/.fzf.zsh
+
+# Direnv integration (if installed)
+if type "direnv" > /dev/null; then
+  eval "$(direnv hook zsh)"
+fi
+
+# Homebrew integration (macOS)
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+###############################################################################
+# COMPLETION SYSTEM
+###############################################################################
+# Set the fpath for custom completions
 fpath=(~/.zsh/completions $fpath)
+
+# Load necessary functions
 autoload -U zmv
 autoload -U promptinit && promptinit
 autoload -U colors && colors
 
+# Add Homebrew zsh completions if brew exists
 if type brew &>/dev/null; then
-     FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
-
-     autoload -Uz compinit
-     compinit
+  FPATH="$(brew --prefix)/share/zsh-completions:$FPATH"
 fi
 
-autoload -Uz compinit 
-compinit -C
+# Initialize zsh completions with caching (-C) and ignore insecure directories (-i)
+autoload -Uz compinit && compinit -i -C
 
+###############################################################################
+# ENVIRONMENT VARIABLES
+###############################################################################
 export VISUAL=nvim
 export EDITOR=nvim
-export PATH="/opt/homebrew/bin:$PATH" 
-export PATH="/usr/local/bin:$PATH"
 
-# error with starship_zle-keymap-select-wrapped
-function zle-line-init zle-keymap-select {
-RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
-RPS2=$RPS1
-zle reset-prompt
-}
-zle -N zle-line-init
-zle -N zle-keymap-select
+# Update PATH (order matters)
+export PATH="/opt/homebrew/bin:/usr/local/bin:/Users/yesh/.cargo/bin:/Users/yesh/.local/share/bob/nvim-bin:/Users/yesh/.bun/bin:$HOME/commands:$PATH"
 
+###############################################################################
+# ZLE (ZSH LINE EDITOR) CUSTOMIZATION
+###############################################################################
+# Show mode indicator in the prompt for vi key bindings (used by Starship)
+# function zle-line-init zle-keymap-select {
+#   RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
+#   RPS2=$RPS1
+#   zle reset-prompt
+# }
+# zle -N zle-line-init
+# zle -N zle-keymap-select
 
+###############################################################################
+# STARSHIP PROMPT
+###############################################################################
 eval "$(starship init zsh)"
 
-# VIM MODE (http://dougblack.io/words/zsh-vi-mode.html) -----------------------
-# bindkey -v
-bindkey '^?' backward-delete-char
+###############################################################################
+# KEY BINDINGS & VIM MODE
+###############################################################################
+# (Uncomment the following line to enable full vi-mode)
 
-#############################################################
-#                        ALIASES                            #
-#############################################################
+# Enhanced history search with fzf
+fhist() {
+  print -z $( ([ -n "$ZSH_NAME" ] && fc -l 1 || history) |
+    fzf +s --tac |
+    sed -E 's/ *[0-9]*\*? *//' |
+    sed -E 's/\\/\\\\/g')
+}
+
+# Bind to Ctrl-R
+bindkey -s '^R' 'fhist\n'
+
+###############################################################################
+# ALIASES
+###############################################################################
+## Tmux
 alias ta='tmux attach -t'
+alias tzer='bash ~/.tmux/scripts/tmux-sessionizer.sh'
 
-alias l='exa -lah --git --all'
-alias ll='exa -lh --git'
-alias ls=exa
-alias sl=exa
-alias lt='exa -lh --git --all --tree'
+## File and directory listings using eza
+alias l='eza -lah --git --all'
+alias ll='eza -lh --git'
+alias ls='eza'
+alias sl='eza'
+alias lt='eza -lh --git --all --tree'
 
+## Common commands
 alias c='clear'
 alias s='source ~/.zshrc'
-alias trim="awk '{\$1=\$1;print}'"
 alias rm='rm -I'
+alias op='open .'
+alias v='nvim'
 
-alias tzer='bash ~/.tmux/scripts/tmux-sessionizer.sh'
-alias wimg="wget -nd -H -p -A jpg,jpeg,png,gif -e robots=off "
-
-alias capslock='setxkbmap -option caps:escape'
-
-# Generate random password
-alias p="openssl rand -base64 32"
-
-alias ytmp3="yt-dlp -f 'ba' -x --audio-format mp3 -o '%(title)s.%(ext)s'"
-
-# Dirs
+## Directory navigation shortcuts
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
 alias .....="cd ../../../.."
 alias ......="cd ../../../../.."
 
-take() {
-  mkdir -p "$1" && cd "$1"
-}
-
-# Dev
-alias p="pnpm"
-alias pd="pnpm dev"
-alias pb="pnpm build"
-alias ps="pnpm start"
-alias pt="pnpm test"
-
-alias op="open ."
-
-alias v="nvim"
-
-# HTTP requests with xh!
+## HTTP requests with xh
 alias http="xh"
 
-# notes
+## Notes shortcut
 alias nn="cd ~/notes && ./notes.sh"
 
-# navigation
+###############################################################################
+# FZF-BASED NAVIGATION HELPERS
+###############################################################################
+# Change directory then list contents
 cx() { cd "$@" && l; }
-fcd() { cd "$(find . -type d -not -path '*/.*' | fzf)" && l; }
-f() { echo "$(find . -type f -not -path '*/.*' | fzf)" | pbcopy }
-fv() { nvim "$(find . -type f -not -path '*/.*' | fzf)" }
 
-# chezmoi
+# Fuzzy change directory (ignores hidden directories)
+fcd() { cd "$(find . -type d -not -path '*/.*' | fzf)" && l; }
+
+# Fuzzy file search and copy filename to clipboard
+f() { echo "$(find . -type f -not -path '*/.*' | fzf)" | pbcopy; }
+
+# Fuzzy file search and open file in nvim
+fv() { nvim "$(find . -type f -not -path '*/.*' | fzf)"; }
+
+###############################################################################
+# CHEZMOI INTEGRATION
+###############################################################################
 alias dot="chezmoi cd"
 alias dot-add="chezmoi add"
 alias dot-apply="chezmoi -v apply"
 alias dot-diff="chezmoi diff"
 alias dot-edit="chezmoi edit"
 
-#############################################################
-#                       GIT ALIASES                         #
-#############################################################
-alias gc='git commit -m '
+###############################################################################
+# GIT ALIASES & FUNCTIONS
+###############################################################################
+alias gc='git commit -m'
 alias gco='git checkout'
 alias ga='git add .'
 alias gst='git status'
@@ -129,182 +167,152 @@ alias gp='git push'
 alias ff='gpr && git pull --ff-only'
 alias grd='git fetch origin && git rebase origin/master'
 alias gbb='git-switchbranch'
-alias gl=pretty_git_log
-alias gla=pretty_git_log_all
+alias gl='pretty_git_log'
+alias gla='pretty_git_log_all'
 alias git-current-branch="git branch | grep \* | cut -d ' ' -f2"
 alias grc='git rebase --continue'
 alias gra='git rebase --abort'
-alias gec='git status | grep "both modified:" | cut -d ":" -f 2 | trim | xargs nvim -'
-
+alias gec='git status | grep "both modified:" | cut -d ":" -f2 | trim | xargs nvim -'
 alias gg='git branch | fzf | xargs git checkout'
 alias gup='git branch --set-upstream-to=origin/$(git-current-branch) $(git-current-branch)'
-
 alias lg='lazygit'
+alias kvim="NVIM_APPNAME=kvim nvim"
 
-
-# Copied from Gary Bernhardt (destroyallsoftware.com) dot files repository.
-# https://github.com/andrew8088/dotfiles/blob/main/zsh/git.zsh
-
+# Git log formatting variables
 LOG_HASH="%C(always,yellow)%h%C(always,reset)"
 LOG_RELATIVE_TIME="%C(always,green)(%ar)%C(always,reset)"
 LOG_AUTHOR="%C(always,blue)<%an>%C(always,reset)"
 LOG_REFS="%C(always,red)%d%C(always,reset)"
 LOG_SUBJECT="%s"
-
 LOG_FORMAT="$LOG_HASH}$LOG_AUTHOR}$LOG_RELATIVE_TIME}$LOG_SUBJECT $LOG_REFS"
 
+# Git branch formatting variables
 BRANCH_PREFIX="%(HEAD)"
 BRANCH_REF="%(color:red)%(color:bold)%(refname:short)%(color:reset)"
 BRANCH_HASH="%(color:yellow)%(objectname:short)%(color:reset)"
 BRANCH_DATE="%(color:green)(%(committerdate:relative))%(color:reset)"
 BRANCH_AUTHOR="%(color:blue)%(color:bold)<%(authorname)>%(color:reset)"
 BRANCH_CONTENTS="%(contents:subject)"
-
 BRANCH_FORMAT="}$BRANCH_PREFIX}$BRANCH_REF}$BRANCH_HASH}$BRANCH_DATE}$BRANCH_AUTHOR}$BRANCH_CONTENTS"
 
+# Git log and branch functions
 show_git_head() {
-    pretty_git_log -1
-    git show -p --pretty="tformat:"
+  pretty_git_log -1
+  git show -p --pretty="tformat:"
 }
 
 pretty_git_log() {
-    git log --since="6 months ago" --graph --pretty="tformat:${LOG_FORMAT}" $* | pretty_git_format | git_page_maybe
+  git log --since="6 months ago" --graph --pretty="tformat:${LOG_FORMAT}" "$@" | pretty_git_format | git_page_maybe
 }
 
 pretty_git_log_all() {
-    git log --all --since="6 months ago" --graph --pretty="tformat:${LOG_FORMAT}" $* | pretty_git_format | git_page_maybe
+  git log --all --since="6 months ago" --graph --pretty="tformat:${LOG_FORMAT}" "$@" | pretty_git_format | git_page_maybe
 }
 
-
 pretty_git_branch() {
-    git branch -v --color=always --format=${BRANCH_FORMAT} $* | pretty_git_format
+  git branch -v --color=always --format="${BRANCH_FORMAT}" "$@" | pretty_git_format
 }
 
 pretty_git_branch_sorted() {
-    git branch -v --color=always --format=${BRANCH_FORMAT} --sort=-committerdate $* | pretty_git_format
+  git branch -v --color=always --format="${BRANCH_FORMAT}" --sort=-committerdate "$@" | pretty_git_format
 }
 
 pretty_git_format() {
-    # Replace (2 years ago) with (2 years)
-    sed -Ee 's/(^[^)]*) ago\)/\1)/' |
-    # Replace (2 years, 5 months) with (2 years)
-    sed -Ee 's/(^[^)]*), [[:digit:]]+ .*months?\)/\1)/' |
-    # Shorten time
-    sed -Ee 's/ seconds?\)/s\)/' |
-    sed -Ee 's/ minutes?\)/m\)/' |
-    sed -Ee 's/ hours?\)/h\)/' |
-    sed -Ee 's/ days?\)/d\)/' |
-    sed -Ee 's/ weeks?\)/w\)/' |
-    sed -Ee 's/ months?\)/M\)/' |
-    # Shorten names
-    sed -Ee 's/<Andrew Burgess>/<me>/' |
-    sed -Ee 's/<([^ >]+) [^>]*>/<\1>/' |
-    # Line columns up based on } delimiter
-    column -s '}' -t
+  sed -Ee 's/(^[^)]*) ago\)/\1)/' | \
+  sed -Ee 's/(^[^)]*), [[:digit:]]+ .*months?\)/\1)/' | \
+  sed -Ee 's/ seconds?\)/s\)/' | \
+  sed -Ee 's/ minutes?\)/m\)/' | \
+  sed -Ee 's/ hours?\)/h\)/' | \
+  sed -Ee 's/ days?\)/d\)/' | \
+  sed -Ee 's/ weeks?\)/w\)/' | \
+  sed -Ee 's/ months?\)/M\)/' | \
+  sed -Ee 's/<Andrew Burgess>/<me>/' | \
+  sed -Ee 's/<([^ >]+) [^>]*>/<\1>/' | \
+  column -s '}' -t
 }
 
 git_page_maybe() {
-    # Page only if we're asked to.
-    if [ -n "${GIT_NO_PAGER}" ]; then
-        cat
-    else
-        # Page only if needed.
-        less --quit-if-one-screen --no-init --RAW-CONTROL-CHARS --chop-long-lines
-    fi
+  if [ -n "${GIT_NO_PAGER}" ]; then
+    cat
+  else
+    less --quit-if-one-screen --no-init --RAW-CONTROL-CHARS --chop-long-lines
+  fi
 }
 
-copy-line () {
-  rg --line-number "${1:-.}" | fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | awk -F ':' '{print $3}' | sed 's/^\s+//' | pbcopy
+# Use fzf and ripgrep to copy or open specific lines
+copy-line() {
+  rg --line-number "${1:-.}" | \
+  fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | \
+  awk -F ':' '{print $3}' | sed 's/^\s\+//' | pbcopy
 }
 
-open-at-line () {
-  vim $(rg --line-number "${1:-.}" | fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | awk -F ':' '{print "+"$2" "$1}')
+open-at-line() {
+  vim $(rg --line-number "${1:-.}" | \
+  fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | \
+  awk -F ':' '{print "+"$2" "$1}')
 }
 
-#############################################################
-#                        DOCKER                             #
-#############################################################
+###############################################################################
+# DOCKER COMMANDS & ALIASES
+###############################################################################
+alias d='docker'
+alias dc='docker-compose'
+alias dkill="pgrep 'Docker' | xargs kill -9"
+alias docker-clear='dclear'
+
+dclear() {
+  docker ps -a -q | xargs docker kill -f
+  docker ps -a -q | xargs docker rm -f
+  docker images | grep "api\|none" | awk '{print $3}' | xargs docker rmi -f
+  docker volume prune -f
+}
+
+dreset() {
+  dclear
+  docker images -q | xargs docker rmi -f
+  docker volume rm $(docker volume ls | awk '{print $2}')
+  rm -rf ~/Library/Containers/com.docker.docker/Data/*
+  docker system prune -a
+}
 
 alias unmount_all_and_exit='unmount_all && exit'
-alias d=docker
-alias dc=docker-compose
-alias dkill="pgrep \"Docker\" | xargs kill -9"
 
-dclear () {
-    docker ps -a -q | xargs docker kill -f
-    docker ps -a -q | xargs docker rm -f
-    docker images | grep "api\|none" | awk '{print $3}' | xargs docker rmi -f
-    docker volume prune -f
-}
-
-alias docker-clear=dclear
-
-dreset () {
-    dclear
-    docker images -q | xargs docker rmi -f
-    docker volume rm $(docker volume ls |awk '{print $2}')
-    rm -rf ~/Library/Containers/com.docker.docker/Data/*
-    docker system prune -a
-}
-
-
-#############################################################
-#                        COMPLETION                         #
-#############################################################
-
-# tab completion
+###############################################################################
+# FZF & COMPLETION CONFIGURATION
+###############################################################################
+# Enable tab completion options
 setopt hash_list_all
-# https://stackoverflow.com/a/14900496/8514646
 bindkey '^i' expand-or-complete-prefix
-# by category
-# https://old.reddit.com/r/zsh/comments/6l797o/organizing_co mpletions_by_category/
-# https://github.com/sorinionescu/prezto/blob/master/modules/completion/init.zsh#L60
-zstyle ':completion:*:*:*:*:*' menu select
-zstyle ':completion:*:matches' group 'yes'
-zstyle ':completion:*:options' description 'yes'
-zstyle ':completion:*:options' auto-description '%d'
-zstyle ':completion:*:corrections' format ' %F{green}-- %d (errors: %e) --%f'
-zstyle ':completion:*:descriptions' format ' %F{yellow}-- %d --%f'
-zstyle ':completion:*:messages' format ' %F{purple} -- %d -- %f'
-zstyle ':completion:*:warnings' format ' %F{red}-- no matches found --%f'
-zstyle ':completion:*:default' list-prompt '%S%M matches%s'
-zstyle ':completion:*' format ' %F{yellow}-- %d --%f'
-zstyle ':completion:*' group-name ''
-zstyle ':completion:*' verbose yes
 
-eval "$(zoxide init zsh)"
-
-# Setting rg as the default source for fzf
+# Set ripgrep as the default command for fzf
 export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
-
-# To apply the command to CTRL-T as well
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 
-# dracula theme for FZF
-export FZF_DEFAULT_OPTS='--color=fg:#f8f8f2,bg:#282a36,hl:#bd93f9 --color=fg+:#f8f8f2,bg+:#44475a,hl+:#bd93f9 --color=info:#ffb86c,prompt:#50fa7b,pointer:#ff79c6 --color=marker:#ff79c6,spinner:#ffb86c,header:#6272a4'
+# earl grey theme
+export FZF_DEFAULT_OPTS='--color=fg:#605A52,bg:#ffffff,hl:#83577D --color=fg+:#605A52,bg+:#CBD2E1,hl+:#83577D --color=info:#747B4D,prompt:#747B4D,pointer:#83577D --color=marker:#83577D,spinner:#747B4D,header:#9C958B'
 
+###############################################################################
+# ZOXIDE (DIRECTORY JUMPING)
+###############################################################################
+eval "$(zoxide init zsh)"
 
-
-# https://github.com/robbyrussell/oh-my-zsh/blob/master/lib/history.zsh
-## History wrapper
+###############################################################################
+# HISTORY CONFIGURATION
+###############################################################################
 function omz_history {
   local clear list
   zparseopts -E c=clear l=list
 
   if [[ -n "$clear" ]]; then
-    # if -c provided, clobber the history file
     echo -n >| "$HISTFILE"
-    echo >&2 History file deleted. Reload the session to see its effects.
+    echo >&2 "History file deleted. Reload the session to see its effects."
   elif [[ -n "$list" ]]; then
-    # if -l provided, run as if calling `fc' directly
     builtin fc "$@"
   else
-    # unless a number is provided, show all history events (starting from 1)
     [[ ${@[-1]-} = *[0-9]* ]] && builtin fc -l "$@" || builtin fc -l "$@" 1
   fi
 }
 
-# Timestamp format
 case ${HIST_STAMPS-} in
   "mm/dd/yyyy") alias history='omz_history -f' ;;
   "dd.mm.yyyy") alias history='omz_history -E' ;;
@@ -313,186 +321,51 @@ case ${HIST_STAMPS-} in
   *) alias history="omz_history -t '$HIST_STAMPS'" ;;
 esac
 
-## History file configuration
 [ -z "$HISTFILE" ] && HISTFILE="$HOME/.zsh_history"
 HISTSIZE=50000
 SAVEHIST=100000
 
-## History command configuration
-setopt extended_history       # record timestamp of command in HISTFILE
-setopt hist_expire_dups_first # delete duplicates first when HISTFILE size exceeds HISTSIZE
-setopt hist_ignore_dups       # ignore duplicated commands history list
-setopt hist_ignore_space      # ignore commands that start with space
-setopt hist_verify            # show command with history expansion to user before running it
-setopt inc_append_history     # add commands to HISTFILE in order of execution
-# setopt share_history          # share command history data
+setopt extended_history       # record timestamps in history
+setopt hist_expire_dups_first  # expire duplicates first when history exceeds limit
+setopt hist_ignore_dups        # ignore duplicate commands
+setopt hist_ignore_space       # ignore commands starting with a space
+setopt hist_verify             # verify history expansion before execution
+setopt inc_append_history      # append commands to history immediately
+# setopt share_history         # uncomment to share history between sessions
 
-# lf icons
-export LF_ICONS="\
-tw=:\
-st=:\
-ow=:\
-dt=:\
-di=:\
-fi=:\
-ln=:\
-or=:\
-ex=:\
-*.c=:\
-*.cc=:\
-*.clj=:\
-*.coffee=:\
-*.cpp=:\
-*.css=:\
-*.d=:\
-*.dart=:\
-*.erl=:\
-*.exs=:\
-*.fs=:\
-*.go=:\
-*.h=:\
-*.hh=:\
-*.hpp=:\
-*.hs=:\
-*.html=:\
-*.java=:\
-*.jl=:\
-*.js=:\
-*.json=:\
-*.lua=:\
-*.md=:\
-*.php=:\
-*.pl=:\
-*.pro=:\
-*.py=:\
-*.rb=:\
-*.rs=:\
-*.scala=:\
-*.ts=:\
-*.vim=:\
-*.cmd=:\
-*.ps1=:\
-*.sh=:\
-*.bash=:\
-*.zsh=:\
-*.fish=:\
-*.tar=:\
-*.tgz=:\
-*.arc=:\
-*.arj=:\
-*.taz=:\
-*.lha=:\
-*.lz4=:\
-*.lzh=:\
-*.lzma=:\
-*.tlz=:\
-*.txz=:\
-*.tzo=:\
-*.t7z=:\
-*.zip=:\
-*.z=:\
-*.dz=:\
-*.gz=:\
-*.lrz=:\
-*.lz=:\
-*.lzo=:\
-*.xz=:\
-*.zst=:\
-*.tzst=:\
-*.bz2=:\
-*.bz=:\
-*.tbz=:\
-*.tbz2=:\
-*.tz=:\
-*.deb=:\
-*.rpm=:\
-*.jar=:\
-*.war=:\
-*.ear=:\
-*.sar=:\
-*.rar=:\
-*.alz=:\
-*.ace=:\
-*.zoo=:\
-*.cpio=:\
-*.7z=:\
-*.rz=:\
-*.cab=:\
-*.wim=:\
-*.swm=:\
-*.dwm=:\
-*.esd=:\
-*.jpg=:\
-*.jpeg=:\
-*.mjpg=:\
-*.mjpeg=:\
-*.gif=:\
-*.bmp=:\
-*.pbm=:\
-*.pgm=:\
-*.ppm=:\
-*.tga=:\
-*.xbm=:\
-*.xpm=:\
-*.tif=:\
-*.tiff=:\
-*.png=:\
-*.svg=:\
-*.svgz=:\
-*.mng=:\
-*.pcx=:\
-*.mov=:\
-*.mpg=:\
-*.mpeg=:\
-*.m2v=:\
-*.mkv=:\
-*.webm=:\
-*.ogm=:\
-*.mp4=:\
-*.m4v=:\
-*.mp4v=:\
-*.vob=:\
-*.qt=:\
-*.nuv=:\
-*.wmv=:\
-*.asf=:\
-*.rm=:\
-*.rmvb=:\
-*.flc=:\
-*.avi=:\
-*.fli=:\
-*.flv=:\
-*.gl=:\
-*.dl=:\
-*.xcf=:\
-*.xwd=:\
-*.yuv=:\
-*.cgm=:\
-*.emf=:\
-*.ogv=:\
-*.ogx=:\
-*.aac=:\
-*.au=:\
-*.flac=:\
-*.m4a=:\
-*.mid=:\
-*.midi=:\
-*.mka=:\
-*.mp3=:\
-*.mpc=:\
-*.ogg=:\
-*.ra=:\
-*.wav=:\
-*.oga=:\
-*.opus=:\
-*.spx=:\
-*.xspf=:\
-*.pdf=:\
-*.nix=:\
-"
+###############################################################################
+# LF FILE MANAGER ICONS
+###############################################################################
+export LF_ICONS="tw=:st=:ow=:dt=:di=:fi=:ln=:or=:ex=:*.c=:*.cc=:*.clj=:*.coffee=:*.cpp=:*.css=:*.d=:*.dart=:*.erl=:*.exs=:*.fs=:*.go=:*.h=:*.hh=:*.hpp=:*.hs=:*.html=:*.java=:*.jl=:*.js=:*.json=:*.lua=:*.md=:*.php=:*.pl=:*.pro=:*.py=:*.rb=:*.rs=:*.scala=:*.ts=:*.vim=:*.cmd=:*.ps1=:*.sh=:*.bash=:*.zsh=:*.fish=:*.tar=:*.tgz=:*.arc=:*.arj=:*.taz=:*.lha=:*.lz4=:*.lzh=:*.lzma=:*.tlz=:*.txz=:*.tzo=:*.t7z=:*.zip=:*.z=:*.dz=:*.gz=:*.lrz=:*.lz=:*.lzo=:*.xz=:*.zst=:*.tzst=:*.bz2=:*.bz=:*.tbz=:*.tbz2=:*.tz=:*.deb=:*.rpm=:*.jar=:*.war=:*.ear=:*.sar=:*.rar=:*.alz=:*.ace=:*.zoo=:*.cpio=:*.7z=:*.rz=:*.cab=:*.wim=:*.swm=:*.dwm=:*.esd=:*.jpg=:*.jpeg=:*.mjpg=:*.mjpeg=:*.gif=:*.bmp=:*.pbm=:*.pgm=:*.ppm=:*.tga=:*.xbm=:*.xpm=:*.tif=:*.tiff=:*.png=:*.svg=:*.svgz=:*.mng=:*.pcx=:*.mov=:*.mpg=:*.mpeg=:*.m2v=:*.mkv=:*.webm=:*.ogm=:*.mp4=:*.m4v=:*.mp4v=:*.vob=:*.qt=:*.nuv=:*.wmv=:*.asf=:*.rm=:*.rmvb=:*.flc=:*.avi=:*.fli=:*.flv=:*.gl=:*.dl=:*.xcf=:*.xwd=:*.yuv=:*.cgm=:*.emf=:*.ogv=:*.ogx=:*.aac=:*.au=:*.flac=:*.m4a=:*.mid=:*.midi=:*.mka=:*.mp3=:*.mpc=:*.ogg=:*.ra=:*.wav=:*.oga=:*.opus=:*.spx=:*.xspf=:*.pdf=:*.nix=:"
 
+###############################################################################
+# PLUGIN SOURCING
+###############################################################################
+# Zsh Syntax Highlighting
 source ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+# Zsh Autosuggestions
 source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# FZF Tab Plugin
 source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
 
-source /Users/yesh/.config/broot/launcher/bash/br
+###############################################################################
+# NODE VERSION MANAGER (NVM)
+###############################################################################
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+
+###############################################################################
+# PYTHON ENVIRONMENTS (pyenv)
+###############################################################################
+export PYENV_ROOT="$HOME/.pyenv"
+[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+
+###############################################################################
+# ADDITIONAL BINARIES (e.g., pipx)
+###############################################################################
+export PATH="$PATH:/Users/yesh/.local/bin"
+

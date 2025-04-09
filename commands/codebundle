@@ -292,7 +292,7 @@ slice_files() {
         ((errors_encountered++))
         continue
       fi
-      next_marker=$(grep -n "^### \*\*\`" "$input_file" | awk -v line="$line_num" '$1 > line {print $1; exit}')
+      next_marker=$(grep -n "^### \*\*\`" "$input_file" | cut -d: -f1 | awk -v line="$line_num" '$1 > line {print $1; exit}')
       if [[ -z "$next_marker" ]]; then
         next_marker=$(wc -l <"$input_file")
       else
