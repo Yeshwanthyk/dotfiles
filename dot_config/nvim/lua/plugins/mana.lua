@@ -15,18 +15,19 @@ Use descriptive, explicit variable names to enhance readability. Adhere to the e
         envs = {
           openrouter = "OPENROUTER_API_KEY",
           deepseek = "DEEPSEEK_API_KEY",
-          aistudio = "AISTUDIO_API_KEY", -- Google AI Studio
+          aistudio = "AISTUDIO_API_KEY",
+          openai = "OPENAI_API_KEY",
         },
         models = {
-          ["Openrouter Quaser"] = {
+          ["OR Optimus"] = {
             endpoint = "openrouter",
-            name = "openrouter/quasar-alpha",
+            name = "openrouter/optimus-alpha",
             display_name = "Openrouter Quaser",
             system_prompt = system_prompt,
             temperature = 0.5,
             top_p = 0.9,
           },
-          ["Deepseek Coder"] = {
+          ["DS"] = {
             endpoint = "deepseek",
             name = "deepseek-chat",
             display_name = "Deepseek Coder",
@@ -34,13 +35,29 @@ Use descriptive, explicit variable names to enhance readability. Adhere to the e
             temperature = 0.5,
             top_p = 0.9,
           },
-          ["Openrouter DS"] = {
+          ["DS Free"] = {
             endpoint = "openrouter",
             name = "deepseek/deepseek-chat-v3-0324:free",
             display_name = "Openrouter DS",
             system_prompt = system_prompt,
             temperature = 0.5,
             top_p = 0.9,
+          },
+          ["OR GPT-4o"] = {
+            endpoint = "openrouter",
+            name = "openai/gpt-4o-mini",
+            display_name = "OpenAI GPT-4o",
+            system_prompt = system_prompt,
+            temperature = 0.5,
+            top_p = 0.95,
+          },
+          ["OR Gemini 2 Flash"] = {
+            endpoint = "openrouter",
+            name = "google/gemini-2.0-flash-exp:free",
+            display_name = "OpenAI GPT-4o",
+            system_prompt = system_prompt,
+            temperature = 0.5,
+            top_p = 0.95,
           },
           ["AI Studio"] = {
             endpoint = "aistudio",
@@ -50,17 +67,9 @@ Use descriptive, explicit variable names to enhance readability. Adhere to the e
             temperature = 0.7,
             top_p = 1.0,
           },
-          ["Groq Llama"] = {
-            endpoint = "groq",
-            name = "llama-3.3-70b-versatile",
-            display_name = "Groq Llama",
-            system_prompt = system_prompt,
-            temperature = 0.7,
-            top_p = 1.0,
-          },
           ["Code Rewriter"] = {
             endpoint = "openrouter",
-            name = "openrouter/quasar-alpha",
+            name = "openrouter/optimus-alpha",
             system_prompt = "You should replace the code that you are sent, only following the comments. Do not talk at all. Only output valid code. Do not provide any backticks that surround the code. Never ever output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them. Other comments should left alone. Do not output backticks",
             display_name = "Code Rewriter",
             temperature = 0.3,
@@ -68,14 +77,14 @@ Use descriptive, explicit variable names to enhance readability. Adhere to the e
           },
           ["Code Editor"] = {
             endpoint = "openrouter",
-            name = "openrouter/quasar-alpha",
-            system_prompt = "You are a helpful assistant. What I have sent are my notes so far.",
+            name = "openrouter/optimus-alpha",
+            system_prompt = "You are a helpful assistant. What I have sent are my notes so far. Be concise when possible. Only valid code.",
             display_name = "Code Editor",
             temperature = 0.7,
             top_p = 1.0,
           },
         },
-        default_model = "Openrouter Quaser",
+        default_model = "OR Optimus",
       })
     end,
     keys = {
