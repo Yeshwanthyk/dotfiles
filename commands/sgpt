@@ -1,0 +1,152 @@
+#!/bin/bash
+
+# Simple GPT CLI utility (sgpt)
+# Usage: sgpt [-m model] "your prompt"
+
+# Configuration section - set your preferred models for each provider
+OPENAI_DEFAULT_MODEL="gpt-4o-mini"
+OPENROUTER_DEFAULT_MODEL="openrouter/optimus-alpha"
+DEEPSEEK_DEFAULT_MODEL="deepseek-chat"
+OLLAMA_DEFAULT_MODEL="qwen2.5-coder:latest"
+OLLAMA_HOST="http://localhost:11434"
+
+# Default provider
+DEFAULT_PROVIDER="openrouter"
+
+# Parse arguments
+PROVIDER=$DEFAULT_PROVIDER
+if [[ "$1" == "-m" ]]; then
+  PROVIDER=$2
+  shift 2
+fi
+
+if [[ $# -eq 0 ]]; then
+  echo "Usage: sgpt [-m provider] \"your prompt\""
+  echo "Available providers: openai, openrouter, groq, aistudio, deepseek, ollama"
+  exit 1
+fi
+
+PROMPT="$*"
+SYSTEM_PROMPT="You are a helpful AI assistant focusing on programming. Provide only code without explanations unless specifically asked. Format your response using markdown code blocks with language tags."
+
+# API endpoint configuration
+case $PROVIDER in
+"openai")
+  API_KEY=$OPENAI_API_KEY
+  URL="https://api.openai.com/v1/chat/completions"
+  MODEL_NAME=$OPENAI_DEFAULT_MODEL
+  ;;
+"openrouter")
+  API_KEY=$OPENROUTER_API_KEY
+  URL="https://openrouter.ai/api/v1/chat/completions"
+  MODEL_NAME=$OPENROUTER_DEFAULT_MODEL
+  ;;
+"deepseek")
+  API_KEY=$DEEPSEEK_API_KEY
+  URL="https://api.deepseek.com/v1/chat/completions"
+  MODEL_NAME=$DEEPSEEK_DEFAULT_MODEL
+  ;;
+"ollama")
+  URL="${OLLAMA_HOST}/api/chat"
+  MODEL_NAME=$OLLAMA_DEFAULT_MODEL
+  ;;
+*)
+  echo "Unknown provider: $PROVIDER"
+  echo "Available providers: openai, openrouter, groq, aistudio, deepseek, ollama"
+  exit 1
+  ;;
+esac
+
+# Check if API key is available (except for Ollama which doesn't need a key)
+if [[ "$PROVIDER" != "ollama" && -z "$API_KEY" ]]; then
+  echo "Error: API key for $PROVIDER is not set. Please set ${PROVIDER^^}_API_KEY environment variable."
+  exit 1
+fi
+
+echo "Using provider: $PROVIDER"
+if [[ "$PROVIDER" != "aistudio" ]]; then
+  echo "Model: $MODEL_NAME"
+fi
+echo "Prompt: $PROMPT"
+echo "Thinking..."
+
+# Handle different API formats
+if [[ "$PROVIDER" == "aistudio" ]]; then
+  RESPONSE=$(curl -s \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $API_KEY" \
+    "$URL" \
+    -d '{
+            "contents": [
+                {"role": "user", "parts": [{"text": "'"$PROMPT"'"}]},
+                {"role": "model", "parts": [{"text": "'"$SYSTEM_PROMPT"'"}]}
+            ]
+        }')
+elif [[ "$PROVIDER" == "ollama" ]]; then
+  RESPONSE=$(curl -s \
+    -H "Content-Type: application/json" \
+    "$URL" \
+    -d '{
+            "model": "'"$MODEL_NAME"'",
+            "messages": [
+                {"role": "system", "content": "'"$SYSTEM_PROMPT"'"},
+                {"role": "user", "content": "'"$PROMPT"'"}
+            ],
+            "stream": false
+        }')
+else
+  # Standard API format for OpenAI-compatible APIs
+  RESPONSE=$(curl -s \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $API_KEY" \
+    "$URL" \
+    -d '{
+            "model": "'"$MODEL_NAME"'",
+            "messages": [
+                {"role": "system", "content": "'"$SYSTEM_PROMPT"'"},
+                {"role": "user", "content": "'"$PROMPT"'"}
+            ],
+            "temperature": 0.3
+        }')
+fi
+
+# Extract the content based on provider format
+if [[ "$PROVIDER" == "aistudio" ]]; then
+  CONTENT=$(echo "$RESPONSE" | grep -o '"text": ".*"' | sed 's/"text": "\(.*\)"/\1/' | sed 's/\\n/\n/g' | sed 's/\\"/"/g')
+elif [[ "$PROVIDER" == "ollama" ]]; then
+  CONTENT=$(echo "$RESPONSE" | grep -o '"content":"[^"]*"' | head -1 | sed 's/"content":"//;s/"$//' | sed 's/\\n/\n/g' | sed 's/\\"/"/g')
+else
+  CONTENT=$(echo "$RESPONSE" | grep -o '"content":"[^"]*"' | head -1 | sed 's/"content":"//;s/"$//' | sed 's/\\n/\n/g' | sed 's/\\"/"/g')
+fi
+
+# Extract code blocks with a more reliable pattern
+# This uses awk to capture text between triple backticks
+CODE_BLOCKS=$(echo "$CONTENT" | awk '/```/{if (flag) {flag=0; next} else {flag=1; next}} flag' | sed '/^$/d')
+
+if [[ -z "$CODE_BLOCKS" ]]; then
+  echo "No code blocks found in the response."
+  echo "Full response:"
+  echo "$CONTENT"
+else
+  # Copy to clipboard based on available command
+  if command -v pbcopy &>/dev/null; then
+    # macOS
+    echo "$CODE_BLOCKS" | pbcopy
+  elif command -v xclip &>/dev/null; then
+    # Linux with xclip
+    echo "$CODE_BLOCKS" | xclip -selection clipboard
+  elif command -v xsel &>/dev/null; then
+    # Linux with xsel
+    echo "$CODE_BLOCKS" | xsel --clipboard
+  elif command -v clip.exe &>/dev/null; then
+    # Windows WSL
+    echo "$CODE_BLOCKS" | clip.exe
+  else
+    echo "No clipboard command found. Install xclip, xsel, or use macOS/Windows."
+  fi
+
+  echo "Code has been copied to clipboard:"
+  echo "--------------------------------"
+  echo "$CODE_BLOCKS"
+  echo "--------------------------------"
+fi
