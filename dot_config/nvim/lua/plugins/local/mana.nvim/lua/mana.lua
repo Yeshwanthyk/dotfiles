@@ -381,12 +381,14 @@ local function command_set(model_switch_fn, winbar, winid, bufnr)
           return
         end
         local prompt = table.concat(selected_lines, "\n")
-        -- Delete selection before inserting
+        -- delete entire selection before inserting
         vim.api.nvim_buf_set_lines(bufnr_target, start_row, end_row, false, {})
-        -- Cursor to start of deletion
+
+        -- move cursor to start of deletion
         local line_count_after = vim.api.nvim_buf_line_count(bufnr_target)
-        local new_cursor_row = math.min(start_row, line_count_after)
+        local new_cursor_row = math.min(start_row, line_count_after - 1)
         vim.api.nvim_win_set_cursor(0, { new_cursor_row + 1, 0 })
+
         local messages = {
           { role = "user", content = { { type = "text", text = prompt } } },
         }
@@ -397,26 +399,34 @@ local function command_set(model_switch_fn, winbar, winid, bufnr)
             content = { { type = "text", text = model_cfg_override.system_prompt } },
           })
         end
-        -- Buffer response chunks and insert whole result at once after [DONE]
-        local function replace_callback_factory(bufnr, insert_row)
-          local output_chunks = {}
-          return function(_, data)
-            for line in data:gmatch("[^\r\n]+") do
-              if line:match("^data: ") then
-                if line:match("data: %[DONE%]") then
-                  vim.schedule(function()
-                    local text = table.concat(output_chunks)
-                    local lines = vim.split(text, "\n", { plain = true })
-                    vim.api.nvim_buf_set_lines(bufnr, insert_row, insert_row, false, lines)
-                    vim.api.nvim_win_set_cursor(0, { insert_row + #lines, 0 })
-                  end)
-                else
-                  local ok, decoded = pcall(vim.json.decode, line:sub(7))
-                  if ok and decoded and decoded.choices then
-                    for _, choice in ipairs(decoded.choices) do
-                      if choice.delta and choice.delta.content then
-                        table.insert(output_chunks, choice.delta.content)
-                      end
+
+        -- Custom callback for replace operation
+        local function replace_callback(_, data)
+          for line in data:gmatch("[^\r\n]+") do
+            if line:match("^data: ") then
+              if not line:match("data: %[DONE%]") then
+                local ok, decoded = pcall(vim.json.decode, line:sub(7))
+                if ok and decoded and decoded.choices then
+                  for _, choice in ipairs(decoded.choices) do
+                    if choice.delta and choice.delta.content then
+                      local content = choice.delta.content
+                      vim.schedule(function()
+                        -- Get current cursor position on each update
+                        local cursor = vim.api.nvim_win_get_cursor(0)
+                        local row, col = cursor[1] - 1, cursor[2]
+
+                        local lines = vim.split(content, "\n", { plain = true })
+                        if #lines == 1 then
+                          -- Single line: insert at cursor
+                          vim.api.nvim_buf_set_text(bufnr_target, row, col, row, col, { lines[1] })
+                          vim.api.nvim_win_set_cursor(0, { row + 1, col + #lines[1] })
+                        else
+                          -- Multiple lines: handle properly
+                          vim.api.nvim_buf_set_text(bufnr_target, row, col, row, col, { lines[1] })
+                          vim.api.nvim_buf_set_lines(bufnr_target, row + 1, row + 1, false, vim.list_slice(lines, 2))
+                          vim.api.nvim_win_set_cursor(0, { row + #lines, #lines[#lines] })
+                        end
+                      end)
                     end
                   end
                 end
@@ -424,7 +434,7 @@ local function command_set(model_switch_fn, winbar, winid, bufnr)
             end
           end
         end
-        local replace_callback = replace_callback_factory(bufnr_target, new_cursor_row)
+
         local fetcher = create_fetcher(model_cfg_override, endpoint_cfgs, replace_callback)
         fetcher(messages)
       else
@@ -543,8 +553,8 @@ local function parse_opts_envs(raw)
     aistudio = "https://generativelanguage.googleapis.com/v1beta/chat/completions",
     openrouter = "https://openrouter.ai/api/v1/chat/completions",
     deepseek = "https://api.deepseek.com/v1/chat/completions",
-    groq = "https://api.groq.com/v1/chat/completions",
-    openai = "https://api.openai.com/v1/chat/completions",
+    lmstudio = "http://localhost:1234/v1/chat/completions",
+    grok = "https://api.groq.com/openai/v1/chat/completions",
   }
   local parsed = {}
   for ep, env in pairs(raw) do
