@@ -1,3 +1,3 @@
 require("config.lazy")
 
-require("colors.earl-grey").setup()
+-- require("colors.earl-grey").setup()
