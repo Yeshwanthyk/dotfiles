@@ -4,14 +4,12 @@ local curl = require("plenary.curl")
 
 -- Plugin configuration with defaults
 M.config = {
-  gateway_url = "http://localhost:3000",
-  default_model = nil, -- Will be fetched from gateway
+  gateway_url = "http://localhost:3009",
   default_session_id = "neovim-session",
   debug = true, -- Set to true to enable debug logging (temporary change for troubleshooting)
   keymaps = {
     send_buffers = "<leader>ab", -- Send all buffers to LLM
     cancel = "<Esc>", -- Cancel ongoing LLM request
-    apply_edits = "<leader>ax", -- Apply edits from LLM response
   },
   prompt_template = [[
 You are an expert programming helper.
@@ -21,6 +19,7 @@ When you want to edit files; you **must** show the change in the following speci
 
 ## The special code editing format
 - Uses **file blocks**
+- Each distinct block should be returned in a code block
 - Starts with "... ", and then the filename
 - Ends with "..."
 - Uses **search and replace** blocks
@@ -29,10 +28,12 @@ When you want to edit files; you **must** show the change in the following speci
   - Immediately follows to contain what to replace the code with
   - Finally, ends with ">>>>>> REPLACE"
 - For each file edited, there can be multiple search and replace commands
-- The lines must match **exactly**. This means, all indentation should be preserved.
-- **IMPORTANT**: Copy the exact indentation from the original file.
-- Do not make things up when adding something to the SEARCH block.
+- The `<<<<<< SEARCH` block must contain the *exact, verbatim* lines from the original file that you want to replace, including all indentation and any intermediate blank lines.
+- Do not guess or abbreviate the content for the `SEARCH` block; copy it precisely from the provided context.
 - Do not show SEARCH/REPLACE blocks for files that do not exist.
+- Ensure the `<<<<<<< SEARCH` line uses **exactly 6 `<` characters** (no more, no less).
+- The `======` separator must be on a line by itself.
+- The `>>>>>>> REPLACE` line must use **exactly 6 `>` characters**.
 
 ## Example 1: Modifying a function (preserving indentation)
 ```
@@ -114,6 +115,10 @@ M.stream_progress = 0 -- Counter for showing streaming progress
 M.stream_buffer = nil -- Buffer to display streaming content
 M.stream_window = nil -- Window to display streaming content
 
+-- Spinner frames for progress indication
+local spinner_frames = { "(๑• ◡• )", "(づ｡◕‿‿◕｡)づ", "✩°｡⋆⸜(｡•ω•｡)" }
+local current_spinner_frame = 1
+
 -- Get all loaded buffers
 function M.get_all_buffers()
   local buffers = {}
@@ -124,7 +129,7 @@ function M.get_all_buffers()
         local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
         table.insert(buffers, {
           filename = filename,
-          content = table.concat(lines, "\n")
+          content = table.concat(lines, "\n"),
         })
       end
     end
@@ -198,28 +203,36 @@ end
 -- Show the stream buffer in a split window
 function M.show_stream_buffer(buf, prompt)
   -- Create split window
-  vim.cmd("botright split")
+  vim.cmd("botright vsplit")
+
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_buf(win, buf)
-  vim.api.nvim_win_set_height(win, 15) -- Set reasonable height
+  --   vim.api.nvim_win_set_width(win, 80) -- Set width for vertical split
+  --   vim.api.nvim_win_set_height(win, 20) -- Increased height to show more content
 
   -- Set initial content
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
     "# Request: " .. prompt,
     "",
     "# Response:",
-    "Waiting for response..."
+    "Waiting for response...",
   })
 
   -- Set buffer local keymaps for convenience
-  vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':q<CR>',
-    { noremap = true, silent = true, desc = "Close response window" })
-  vim.api.nvim_buf_set_keymap(buf, 'n', '<Esc>', ':q<CR>',
-    { noremap = true, silent = true, desc = "Close response window" })
+  -- Removed 'q' and '<Esc>' keymaps as requested
+
+  -- Add a keybinding for applying ALL parsed patches from the buffer
+  vim.api.nvim_buf_set_keymap(
+    buf,
+    "n",
+    "<leader>aA", -- Apply All
+    ":lua require('yeti').apply_all_patches()<CR>",
+    { noremap = true, silent = true, desc = "Apply all patches from buffer" }
+  )
 
   -- Add a header with instructions
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-  table.insert(lines, 1, "Press 'q' to close this window.")
+  table.insert(lines, 1, "Press <leader>aA to apply all detected patches.")
   table.insert(lines, 2, "")
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
@@ -227,7 +240,7 @@ function M.show_stream_buffer(buf, prompt)
   M.stream_window = win
 
   -- Return to previous window
-  vim.cmd("wincmd p")
+  -- vim.cmd("wincmd p") -- Removed to keep focus on the new split
 
   return win
 end
@@ -239,10 +252,11 @@ function M.update_stream_buffer(buf, content)
 
     -- Keep the request line at the top
     local request_line = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1]
-    local all_lines = {request_line, "", "# Response:"}
+    local all_lines = { request_line, "", "# Response:" }
 
-    -- Add the response lines
+    -- Process each line to ensure proper code block formatting
     for _, line in ipairs(lines) do
+      -- Handle special code block markers if needed
       table.insert(all_lines, line)
     end
 
@@ -251,7 +265,7 @@ function M.update_stream_buffer(buf, content)
 
     -- Auto-scroll to the bottom if window exists
     if M.stream_window and vim.api.nvim_win_is_valid(M.stream_window) then
-      vim.api.nvim_win_set_cursor(M.stream_window, {#all_lines, 0})
+      vim.api.nvim_win_set_cursor(M.stream_window, { #all_lines, 0 })
     end
   end
 end
@@ -291,7 +305,10 @@ function M.handle_stream_response(data)
 
       if M.stream_progress % 5 == 0 then -- Every 5 chunks
         vim.cmd("redraw")
-        print("Receiving LLM response... " .. string.rep(".", M.stream_progress / 5 % 10))
+        -- Update spinner animation
+        current_spinner_frame = (current_spinner_frame % #spinner_frames) + 1
+        local frame = spinner_frames[current_spinner_frame]
+        vim.cmd("echo 'Yeti generating... " .. frame .. "'")
       end
     end)
   else
@@ -315,8 +332,7 @@ function M.fetch_models()
       if response.status == 200 and response.body then
         local data = vim.json.decode(response.body)
         M.models = data.models
-        M.current_model = data.default
-        print("LLM Gateway: Loaded " .. #M.models .. " models")
+        print("LLM Gateway: Fetched available models. Default: " .. (data.default or "N/A"))
       else
         print("LLM Gateway: Failed to fetch models")
       end
@@ -324,39 +340,8 @@ function M.fetch_models()
   })
 end
 
--- Select model interactively
-function M.select_model()
-  if #M.models == 0 then
-    print("No models available. Fetching models...")
-    M.fetch_models()
-    return
-  end
-
-  vim.ui.select(M.models, {
-    prompt = "Select LLM model:",
-    format_item = function(item)
-      if item == M.current_model then
-        return item .. " (current)"
-      else
-        return item
-      end
-    end,
-  }, function(choice)
-    if choice then
-      M.current_model = choice
-      print("Selected model: " .. choice)
-    end
-  end)
-end
-
 -- Main function to send all buffers to LLM
 function M.send_buffers()
-  if not M.current_model then
-    print("No model selected. Fetching models...")
-    M.fetch_models()
-    return
-  end
-
   -- Get prompt from user
   vim.ui.input({ prompt = "Enter your request: " }, function(input)
     if not input or input == "" then
@@ -383,15 +368,10 @@ function M.send_buffers()
     local context_files = M.format_context_files(buffers)
 
     -- Format prompt with template
-    local formatted_prompt = string.format(
-      M.config.prompt_template,
-      context_files,
-      input
-    )
+    local formatted_prompt = string.format(M.config.prompt_template, context_files, input)
 
-    -- Prepare request
+    -- Prepare request - use the cached model (will be updated by fetch_models at startup)
     local request_data = {
-      model = M.current_model,
       prompt = formatted_prompt,
       sessionId = M.config.default_session_id,
       stream = true,
@@ -406,6 +386,7 @@ function M.send_buffers()
     M.active_job = Job:new({
       command = "curl",
       args = {
+        "-s", -- Add silent flag
         "-N",
         "-X",
         "POST",
@@ -442,12 +423,14 @@ function M.send_buffers()
               local lines = vim.api.nvim_buf_get_lines(M.stream_buffer, 0, -1, false)
               table.insert(lines, "")
               table.insert(lines, "# Processing Complete")
-              table.insert(lines, "Response complete. You can now manually apply any changes.")
+              table.insert(lines, "Response complete. Review the changes above.")
+              table.insert(lines, "You can edit the response buffer directly.")
+              table.insert(lines, "Press <leader>aA to apply all detected patches.")
               vim.api.nvim_buf_set_lines(M.stream_buffer, 0, -1, false, lines)
 
               -- Scroll to the bottom
               if M.stream_window and vim.api.nvim_win_is_valid(M.stream_window) then
-                vim.api.nvim_win_set_cursor(M.stream_window, {#lines, 0})
+                vim.api.nvim_win_set_cursor(M.stream_window, { #lines, 0 })
               end
             end
           end
@@ -516,12 +499,325 @@ function M.save_debug_info(response)
   end
 end
 
+-- Parse LLM response text to extract structured patches
+-- Revised parser to correctly handle multiple patches per file block
+function M.parse_llm_response(response_content)
+  M.log_debug("Starting to parse LLM response for patches (Revised Logic).")
+  local patches = {}
+  local lines
+
+  if type(response_content) == "string" then
+    lines = vim.split(response_content, "\\n")
+  elseif type(response_content) == "table" then
+    lines = response_content
+  else
+    M.log_debug("Invalid response_content type: " .. type(response_content))
+    return patches -- Return empty list if input is invalid
+  end
+
+  local current_filepath = nil
+  local current_old_hunk = nil
+  local current_new_hunk = nil
+  -- States: idle, in_file, in_search, in_replace
+  local state = "idle"
+
+  for i, line in ipairs(lines) do
+    M.log_debug(string.format("Parse Line %d [%s]: %s", i, state, line))
+
+    if state == "idle" then
+      local filepath_match = line:match("^%.%.%.%s*(.+)$")
+      if filepath_match then
+        current_filepath = filepath_match:match("^%s*(.-)%s*$") -- Trim whitespace
+        state = "in_file"
+        M.log_debug("Found file start: '" .. current_filepath .. "'")
+      end
+    elseif state == "in_file" then
+      if line:match("^<<<<<< SEARCH") then
+        current_old_hunk = {}
+        state = "in_search"
+        M.log_debug("Found SEARCH start")
+      elseif line:match("^%.%.%.$") then -- End of file block
+        M.log_debug("Found end of file block for: '" .. (current_filepath or "nil") .. "'")
+        current_filepath = nil
+        state = "idle"
+      end
+      -- Ignore other lines when just in file block (e.g., blank lines between patches)
+    elseif state == "in_search" then
+      if line:match("^======") then
+        current_new_hunk = {}
+        state = "in_replace"
+        M.log_debug("Found separator (======)")
+      else
+        table.insert(current_old_hunk, line)
+      end
+    elseif state == "in_replace" then
+      -- Check for the end-of-patch marker "..." FIRST
+      if line:match("^%.%.%.$") then
+        -- Finalize the current patch
+        if current_filepath and current_old_hunk and current_new_hunk then
+          table.insert(patches, {
+            filepath = current_filepath,
+            old_hunk = current_old_hunk,
+            new_hunk = current_new_hunk,
+          })
+          M.log_debug(
+            string.format(
+              "Stored patch for %s: %d old lines, %d new lines. State -> in_file",
+              current_filepath,
+              #current_old_hunk,
+              #current_new_hunk
+            )
+          )
+        else
+          M.log_debug("Tried to finalize patch but some data was missing. State -> in_file")
+        end
+        -- Reset hunks and go back to in_file state, ready for next SEARCH or file end
+        current_old_hunk = nil
+        current_new_hunk = nil
+        state = "in_file"
+      -- Check for start of replace content marker >>>>>> REPLACE
+      -- This marker *should* technically only appear once right after ====== according to format
+      -- but we capture content *after* it until the '...' line.
+      elseif line:match("^>>>>>> REPLACE") then
+        -- This line itself isn't content, just marks the start. Do nothing here.
+        M.log_debug("Found REPLACE marker")
+      else
+        -- This line is part of the replacement content
+        if current_new_hunk ~= nil then
+          table.insert(current_new_hunk, line)
+        else
+          -- This case should not happen if the format is strictly followed (====== then >>>>>> REPLACE)
+          M.log_debug("Warning: Adding line to new_hunk in 'in_replace' state, but saw no >>>>>> REPLACE yet: " .. line)
+          current_new_hunk = { line } -- Initialize defensively
+        end
+      end
+    end
+  end
+
+  -- End of loop checks (e.g., if file ends mid-patch)
+  if state ~= "idle" and state ~= "in_file" then
+    M.log_debug(
+      "Warning: Response ended unexpectedly in state: " .. state .. " for file " .. (current_filepath or "nil")
+    )
+    -- Decide if we should store a potentially incomplete patch? For now, no.
+  end
+
+  M.log_debug("Finished parsing. Found " .. #patches .. " total patches.")
+  if M.config.debug and #patches > 0 then
+    for i, patch in ipairs(patches) do
+      print(
+        string.format(
+          "[YETI DEBUG] Parsed Patch %d: %s (%d old, %d new)",
+          i,
+          patch.filepath,
+          #patch.old_hunk,
+          #patch.new_hunk
+        )
+      )
+    end
+  end
+  return patches
+end
+
+-- Apply all patches parsed from the stream buffer
+function M.apply_all_patches()
+  M.log_debug("Starting apply_all_patches")
+
+  if not M.stream_buffer or not vim.api.nvim_buf_is_valid(M.stream_buffer) then
+    vim.notify("Stream buffer is not available or invalid.", vim.log.levels.ERROR)
+    return
+  end
+
+  -- Get content from the stream buffer (user might have edited it)
+  local stream_lines = vim.api.nvim_buf_get_lines(M.stream_buffer, 0, -1, false)
+  M.log_debug("Got " .. #stream_lines .. " lines from stream buffer.")
+
+  -- Parse the patches from the buffer content
+  local all_patches = M.parse_llm_response(stream_lines)
+
+  if #all_patches == 0 then
+    vim.notify("No patches found in the stream buffer to apply.", vim.log.levels.WARN)
+    return
+  end
+
+  -- Group patches by filepath
+  local patches_by_file = {}
+  for _, patch in ipairs(all_patches) do
+    local path = vim.fn.expand(patch.filepath) -- Expand path relative to CWD
+    patches_by_file[path] = patches_by_file[path] or {}
+    table.insert(patches_by_file[path], patch)
+  end
+
+  local applied_count = 0
+  local failed_count = 0
+  local errors = {}
+  local original_buf = vim.api.nvim_get_current_buf()
+  local modified_buffers = {}
+
+  for filepath, file_patches in pairs(patches_by_file) do
+    M.log_debug(string.format("Processing %d patches for file: %s", #file_patches, filepath))
+
+    -- Load the buffer for the file
+    local buf = vim.fn.bufadd(filepath)
+    local previous_buf = vim.api.nvim_get_current_buf()
+    local file_opened_successfully = false
+    if not vim.api.nvim_buf_is_loaded(buf) then
+      vim.cmd("silent! edit " .. vim.fn.fnameescape(filepath))
+      buf = vim.api.nvim_get_current_buf()
+      if vim.api.nvim_buf_get_name(buf) == filepath then
+        file_opened_successfully = true
+      end
+    else
+      -- Switch to the buffer if it was already loaded but not current
+      if buf ~= previous_buf then
+        vim.api.nvim_set_current_buf(buf)
+      end
+      file_opened_successfully = true
+    end
+
+    if not file_opened_successfully then
+      M.log_debug(string.format("Failed to load or create buffer for %s", filepath))
+      table.insert(errors, string.format("Failed to load/create buffer for %s", filepath))
+      failed_count = failed_count + #file_patches -- Count all patches for this file as failed
+      -- Switch back if we changed buffer
+      if previous_buf ~= buf and vim.api.nvim_buf_is_valid(previous_buf) then
+        vim.api.nvim_set_current_buf(previous_buf)
+      end
+      goto continue_file_loop -- Skip to the next file
+    end
+
+    local target_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    local patches_with_locations = {}
+    local file_had_errors = false
+
+    -- 1. Find original locations for all patches in this file
+    for i, patch in ipairs(file_patches) do
+      local start_i, end_i
+      local is_creation = (#patch.old_hunk == 0)
+
+      if is_creation then
+        start_i = 0 -- Apply creations/insertions at the beginning
+        M.log_debug(string.format("Patch %d: Marked as creation/insertion at line 0", i))
+      else
+        local found = false
+        for line_num = 1, #target_lines - #patch.old_hunk + 1 do
+          local match = true
+          for hunk_line_idx = 1, #patch.old_hunk do
+            if target_lines[line_num + hunk_line_idx - 1] ~= patch.old_hunk[hunk_line_idx] then
+              match = false
+              break
+            end
+          end
+          if match then
+            start_i = line_num - 1 -- 0-indexed start line
+            M.log_debug(string.format("Patch %d: Found original hunk at line %d (0-indexed)", i, start_i))
+            found = true
+            break
+          end
+        end
+        if not found then
+          M.log_debug(string.format("Patch %d: Old hunk not found in original content of %s", i, filepath))
+          table.insert(errors, string.format("Patch %d: Old hunk not found in %s", i, filepath))
+          failed_count = failed_count + 1
+          file_had_errors = true
+          goto continue_patch_loop -- Skip this patch
+        end
+      end
+      patch.original_start_line = start_i -- Store the found location
+      table.insert(patches_with_locations, patch)
+      ::continue_patch_loop::
+    end
+
+    -- 2. Sort patches by original location descending (bottom-up)
+    table.sort(patches_with_locations, function(a, b)
+      return a.original_start_line > b.original_start_line
+    end)
+
+    -- 3. Apply sorted patches to the buffer
+    local buffer_modified = false
+    for i, patch in ipairs(patches_with_locations) do
+      local start_line = patch.original_start_line
+      local end_line = start_line + #patch.old_hunk
+      M.log_debug(string.format("Applying patch %d (originally line %d) to %s", i, start_line, filepath))
+
+      local success, err = pcall(vim.api.nvim_buf_set_lines, buf, start_line, end_line, false, patch.new_hunk)
+      if success then
+        M.log_debug("Applied patch successfully to buffer.")
+        applied_count = applied_count + 1
+        buffer_modified = true
+      else
+        M.log_debug("Failed to apply patch: " .. tostring(err))
+        table.insert(
+          errors,
+          string.format("Failed applying patch originally at line %d to %s: %s", start_line, filepath, tostring(err))
+        )
+        failed_count = failed_count + 1
+        file_had_errors = true
+      end
+    end
+
+    -- 4. Save the buffer if it was modified and had no errors during application
+    if buffer_modified then
+      modified_buffers[buf] = filepath -- Mark buffer for saving
+    end
+
+    -- Switch back to the previous buffer if we changed
+    if previous_buf ~= buf and vim.api.nvim_buf_is_valid(previous_buf) then
+      vim.api.nvim_set_current_buf(previous_buf)
+    end
+
+    ::continue_file_loop:: -- Label for file loop goto
+  end
+
+  -- Save all modified buffers
+  for buf, filepath in pairs(modified_buffers) do
+    if vim.api.nvim_buf_is_valid(buf) then
+      local current_buf_before_save = vim.api.nvim_get_current_buf()
+      vim.api.nvim_set_current_buf(buf) -- Switch to buffer to save it
+      local write_success, write_err = pcall(vim.cmd, "write")
+      if write_success then
+        M.log_debug("Saved buffer " .. filepath)
+      else
+        M.log_debug("Failed to save buffer " .. filepath .. ": " .. tostring(write_err))
+        table.insert(errors, string.format("Failed to save %s: %s", filepath, tostring(write_err)))
+        -- If save failed, maybe increment failed_count? Depends if patches were counted already.
+        -- Let's not double-count for now.
+      end
+      -- Switch back
+      if vim.api.nvim_buf_is_valid(current_buf_before_save) then
+        vim.api.nvim_set_current_buf(current_buf_before_save)
+      end
+    else
+      M.log_debug("Buffer for " .. filepath .. " became invalid before saving.")
+      table.insert(errors, string.format("Buffer for %s became invalid before saving", filepath))
+    end
+  end
+
+  -- Restore original buffer if it's still valid
+  if vim.api.nvim_buf_is_valid(original_buf) and vim.api.nvim_get_current_buf() ~= original_buf then
+    vim.api.nvim_set_current_buf(original_buf)
+  end
+
+  -- Report results
+  local final_message =
+    string.format("Attempted %d patches. Applied: %d, Failed: %d.", #all_patches, applied_count, failed_count)
+  if failed_count > 0 then
+    vim.notify(final_message .. " Errors:\n" .. table.concat(errors, "\n"), vim.log.levels.ERROR)
+  elseif applied_count > 0 then
+    vim.notify(final_message, vim.log.levels.INFO)
+  else
+    -- No patches applied and no failures probably means old hunks weren't found or other pre-apply errors
+    if #errors > 0 then
+      vim.notify(final_message .. " Errors:\n" .. table.concat(errors, "\n"), vim.log.levels.WARN)
+    else
+      vim.notify("No patches were applied.", vim.log.levels.WARN) -- Should not happen if patches were parsed
+    end
+  end
+  M.log_debug("Finished apply_all_patches.")
+end
+
 -- Create plugin commands
 function M.create_commands()
-  vim.api.nvim_create_user_command("YetiSelectModel", function()
-    M.select_model()
-  end, { desc = "Select LLM model for Yeti" })
-
   vim.api.nvim_create_user_command("YetiSendBuffers", function()
     M.send_buffers()
   end, { desc = "Send all buffers to LLM Gateway" })
@@ -557,8 +853,12 @@ function M.setup(opts)
 
   -- Set up keymaps
   if M.config.keymaps and M.config.keymaps.send_buffers then
-    vim.api.nvim_set_keymap("n", M.config.keymaps.send_buffers, ":YetiSendBuffers<CR>",
-      { noremap = true, silent = true, desc = "Send all buffers to LLM" })
+    vim.api.nvim_set_keymap(
+      "n",
+      M.config.keymaps.send_buffers,
+      ":YetiSendBuffers<CR>",
+      { noremap = true, silent = true, desc = "Send all buffers to LLM" }
+    )
   end
 
   -- Fetch available models on startup

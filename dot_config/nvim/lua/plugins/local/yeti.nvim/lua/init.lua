@@ -1,5 +1,5 @@
 local yeti = require("yeti")
 
 return {
-  setup = yeti.setup
+  setup = yeti.setup,
 }

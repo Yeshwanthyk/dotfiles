@@ -4,8 +4,8 @@ local curl = require("plenary.curl")
 
 -- Plugin configuration with defaults
 M.config = {
-  gateway_url = "http://localhost:3000",
-  default_model = nil, -- Will be fetched from gateway
+  gateway_url = "http://localhost:3009",
+  -- default_model removed as it will be fetched from gateway
   default_session_id = "neovim-session",
   system_prompt = "You are a helpful programming assistant.",
   keymaps = {
@@ -18,7 +18,29 @@ M.config = {
 -- Store available models
 M.models = {}
 M.active_job = nil
-M.current_model = nil
+M.stream_progress = 0 -- Counter for showing streaming progress
+
+-- Spinner frames for progress indication
+local spinner_frames = {
+  "(๑• ◡• )",
+  "(づ｡◕‿‿◕｡)づ",
+  "✩°｡⋆⸜(｡•ω•｡)",
+  "(๑• ◡• )",
+  "(づ｡◕‿‿◕｡)づ",
+  "✩°｡⋆⸜(｡•ω•｡)",
+  "[^_^]",
+  "(>^_^)>",
+  "<(o.o<)",
+  "(*_*)",
+  "(>_<)",
+  "(^_^)v",
+  "（＾_＾）",
+  "(•_•)",
+  "◉_◉",
+  "✦✧",
+}
+
+local current_spinner_frame = 1
 
 -- Write string at cursor position
 function M.write_string_at_cursor(str)
@@ -99,8 +121,7 @@ function M.fetch_models()
       if response.status == 200 and response.body then
         local data = vim.json.decode(response.body)
         M.models = data.models
-        M.current_model = data.default
-        print("LLM Gateway: Loaded " .. #M.models .. " models")
+        print("LLM Gateway: Loaded " .. #M.models .. " models (gateway default: " .. (data.default or "N/A") .. ")")
       else
         print("LLM Gateway: Failed to fetch models")
       end
@@ -117,18 +138,35 @@ function M.select_model()
   end
 
   vim.ui.select(M.models, {
-    prompt = "Select LLM model:",
+    prompt = "Select LLM model (will set gateway default):",
     format_item = function(item)
-      if item == M.current_model then
-        return item .. " (current)"
-      else
-        return item
-      end
+      return item
     end,
   }, function(choice)
     if choice then
-      M.current_model = choice
-      print("Selected model: " .. choice)
+      -- Update the model on the gateway server
+      curl.post({
+        url = M.config.gateway_url .. "/set-default-model",
+        headers = {
+          ["Content-Type"] = "application/json",
+        },
+        body = vim.json.encode({
+          model = choice,
+          sessionId = M.config.default_session_id,
+        }),
+        callback = function(response)
+          if response.status == 200 and response.body then
+            local data = vim.json.decode(response.body)
+            if data.success and data.defaultModel then
+              print("Gateway default model set to: " .. data.defaultModel)
+            else
+              print("Failed to set default model")
+            end
+          else
+            print("LLM Gateway: Failed to set default model")
+          end
+        end,
+      })
     end
   end)
 end
@@ -158,12 +196,6 @@ end
 
 -- Main function to invoke LLM
 function M.invoke_llm(replace)
-  if not M.current_model then
-    print("No model selected. Fetching models...")
-    M.fetch_models()
-    return
-  end
-
   -- Get visual selection
   local visual_lines = M.get_visual_selection()
   local prompt = ""
@@ -181,9 +213,12 @@ function M.invoke_llm(replace)
     return
   end
 
+  -- Reset progress and spinner
+  M.stream_progress = 0
+  current_spinner_frame = 1
+
   -- Prepare request
   local request_data = {
-    model = M.current_model,
     prompt = prompt,
     sessionId = M.config.default_session_id,
     stream = true,
@@ -199,6 +234,7 @@ function M.invoke_llm(replace)
   M.active_job = Job:new({
     command = "curl",
     args = {
+      "-s",
       "-N",
       "-X",
       "POST",
@@ -212,6 +248,17 @@ function M.invoke_llm(replace)
     on_stdout = function(_, data)
       -- Process streamed response using the handler
       M.handle_stream_response(data)
+      -- Update progress indicator
+      M.stream_progress = M.stream_progress + 1
+      vim.schedule(function()
+        if M.stream_progress % 5 == 0 then -- Every 5 chunks
+          vim.cmd("redraw")
+          -- Update spinner animation
+          current_spinner_frame = (current_spinner_frame % #spinner_frames) + 1
+          local frame = spinner_frames[current_spinner_frame]
+          vim.cmd("echo 'Ding requesting... " .. frame .. "'")
+        end
+      end)
     end,
     on_stderr = function(_, data)
       if data and data ~= "" then
@@ -220,6 +267,10 @@ function M.invoke_llm(replace)
     end,
     on_exit = function()
       M.active_job = nil
+      -- Clear progress indicator
+      vim.schedule(function()
+        vim.cmd("echo ''")
+      end)
       -- Restore default Esc behavior
       vim.schedule(function()
         vim.keymap.del("n", M.config.keymaps.cancel)
@@ -233,21 +284,21 @@ end
 
 -- Append at cursor function for normal mode
 function M.append_at_cursor()
-  if not M.current_model then
-    print("No model selected. Fetching models...")
-    M.fetch_models()
-    return
-  end
-
   -- Get current file content as context
   local file_content = M.get_current_file_content()
   local filetype = M.get_filetype()
 
+  -- Reset progress and spinner
+  M.stream_progress = 0
+  current_spinner_frame = 1
+
   -- Prepare request
   local request_data = {
-    model = M.current_model,
-    prompt = "Here is the " .. filetype .. " file content:\n\n" .. file_content ..
-             "\n\nPlease provide code or text to append at the current cursor position.",
+    prompt = "Here is the "
+      .. filetype
+      .. " file content:\n\n"
+      .. file_content
+      .. "\n\nPlease provide code or text to append at the current cursor position.",
     sessionId = M.config.default_session_id,
     stream = true,
     systemPrompt = M.config.system_prompt,
@@ -262,6 +313,7 @@ function M.append_at_cursor()
   M.active_job = Job:new({
     command = "curl",
     args = {
+      "-s",
       "-N",
       "-X",
       "POST",
@@ -275,6 +327,17 @@ function M.append_at_cursor()
     on_stdout = function(_, data)
       -- Process streamed response using the handler
       M.handle_stream_response(data)
+      -- Update progress indicator
+      M.stream_progress = M.stream_progress + 1
+      vim.schedule(function()
+        if M.stream_progress % 5 == 0 then -- Every 5 chunks
+          vim.cmd("redraw")
+          -- Update spinner animation
+          current_spinner_frame = (current_spinner_frame % #spinner_frames) + 1
+          local frame = spinner_frames[current_spinner_frame]
+          vim.cmd("echo 'Ding requesting... " .. frame .. "'")
+        end
+      end)
     end,
     on_stderr = function(_, data)
       if data and data ~= "" then
@@ -283,6 +346,10 @@ function M.append_at_cursor()
     end,
     on_exit = function()
       M.active_job = nil
+      -- Clear progress indicator
+      vim.schedule(function()
+        vim.cmd("echo ''")
+      end)
       -- Restore default Esc behavior
       vim.schedule(function()
         vim.keymap.del("n", M.config.keymaps.cancel)
@@ -311,6 +378,53 @@ function M.clear_session()
   })
 end
 
+-- Function to set default model for the gateway
+function M.set_default_model(model)
+  if not model then
+    -- If no model provided, let the user select
+    M.select_model()
+    return
+  end
+
+  -- Validate model exists
+  local model_valid = false
+  for _, m in ipairs(M.models) do
+    if m == model then
+      model_valid = true
+      break
+    end
+  end
+
+  if not model_valid then
+    print("Model '" .. model .. "' not found in available models")
+    return
+  end
+
+  -- Update the model on the gateway server
+  curl.post({
+    url = M.config.gateway_url .. "/set-default-model",
+    headers = {
+      ["Content-Type"] = "application/json",
+    },
+    body = vim.json.encode({
+      model = model,
+      sessionId = M.config.default_session_id,
+    }),
+    callback = function(response)
+      if response.status == 200 and response.body then
+        local data = vim.json.decode(response.body)
+        if data.success and data.defaultModel then
+          print("Gateway default model set to: " .. data.defaultModel)
+        else
+          print("Failed to set default model")
+        end
+      else
+        print("LLM Gateway: Failed to set default model")
+      end
+    end,
+  })
+end
+
 -- Create plugin commands
 function M.create_commands()
   vim.api.nvim_create_user_command("DingSelect", function()
@@ -324,6 +438,15 @@ function M.create_commands()
   vim.api.nvim_create_user_command("DingRefreshModels", function()
     M.fetch_models()
   end, { desc = "Refresh available LLM models" })
+
+  -- Add command to set default model for gateway
+  vim.api.nvim_create_user_command("DingSetDefault", function(opts)
+    if opts.args and opts.args ~= "" then
+      M.set_default_model(opts.args)
+    else
+      M.select_model() -- If no args, open model selection
+    end
+  end, { nargs = "?", desc = "Set default LLM model for the gateway" })
 
   -- Add direct commands for replace and append
   vim.api.nvim_create_user_command("DingReplace", function()
@@ -354,6 +477,7 @@ function M.setup(opts)
     callback = function()
       if M.active_job then
         M.active_job:shutdown()
+        vim.cmd("echo ''") -- Clear spinner on cancel
         print("LLM request cancelled")
         M.active_job = nil
       end
@@ -367,18 +491,30 @@ function M.setup(opts)
   if M.config.keymaps then
     -- Replace in visual mode
     if M.config.keymaps.replace then
-      vim.api.nvim_set_keymap("v", M.config.keymaps.replace, ":'<,'>DingReplace<CR>",
-        { noremap = true, silent = true, desc = "Replace with LLM response" })
+      vim.api.nvim_set_keymap(
+        "v",
+        M.config.keymaps.replace,
+        ":'<,'>DingReplace<CR>",
+        { noremap = true, silent = true, desc = "Replace with LLM response" }
+      )
     end
 
     -- Append in normal mode
     if M.config.keymaps.append then
-      vim.api.nvim_set_keymap("n", M.config.keymaps.append, ":DingAppend<CR>",
-        { noremap = true, silent = true, desc = "Append LLM response at cursor" })
+      vim.api.nvim_set_keymap(
+        "n",
+        M.config.keymaps.append,
+        ":DingAppend<CR>",
+        { noremap = true, silent = true, desc = "Append LLM response at cursor" }
+      )
 
       -- Append in visual mode
-      vim.api.nvim_set_keymap("v", M.config.keymaps.append, ":'<,'>DingAppend<CR>",
-        { noremap = true, silent = true, desc = "Append LLM response after selection" })
+      vim.api.nvim_set_keymap(
+        "v",
+        M.config.keymaps.append,
+        ":'<,'>DingAppend<CR>",
+        { noremap = true, silent = true, desc = "Append LLM response after selection" }
+      )
     end
   end
 
