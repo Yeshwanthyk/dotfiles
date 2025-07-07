@@ -1,5 +1,11 @@
 return {
 
+  {
+    "eldritch-theme/eldritch.nvim",
+    lazy = false,
+    priority = 1000,
+    opts = {},
+  },
   -- Soothing pastel theme
   {
     "catppuccin/nvim",
