@@ -8,7 +8,7 @@ return {
     "sindrets/diffview.nvim",
     cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewToggleFiles", "DiffviewFocusFiles" },
     opts = {},
-    keys = { { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "DiffView" } },
+    keys = { { "<leader>dv", "<cmd>DiffviewOpen<cr>", desc = "DiffView" } },
   },
 
   { "akinsho/git-conflict.nvim", version = "*", config = true },
@@ -35,23 +35,5 @@ return {
       },
     },
     opts = { snippet_engine = "luasnip" },
-  },
-  {
-    "christoomey/vim-tmux-navigator",
-    cmd = {
-      "TmuxNavigateLeft",
-      "TmuxNavigateDown",
-      "TmuxNavigateUp",
-      "TmuxNavigateRight",
-      "TmuxNavigatePrevious",
-    },
-    keys = {
-      { "<c-h>", "<cmd>TmuxNavigateLeft<cr>" },
-      { "<c-j>", "<cmd>TmuxNavigateDown<cr>" },
-      { "<c-k>", "<cmd>TmuxNavigateUp<cr>" },
-      { "<c-l>", "<cmd>TmuxNavigateRight<cr>" },
-      { "<c-\\>", "<cmd>TmuxNavigatePrevious<cr>" },
-    },
-    event = "VeryLazy",
   },
 }
