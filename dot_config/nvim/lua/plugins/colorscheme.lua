@@ -1,11 +1,15 @@
 return {
 
+  -- Grey colorscheme
   {
-    "eldritch-theme/eldritch.nvim",
+    "yorickpeterse/nvim-grey",
     lazy = false,
     priority = 1000,
-    opts = {},
+    config = function()
+      vim.cmd("colorscheme grey")
+    end,
   },
+
   -- Soothing pastel theme
   {
     "catppuccin/nvim",

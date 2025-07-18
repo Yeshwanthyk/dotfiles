@@ -345,6 +345,60 @@ local function buffer_parse(bufnr)
 end
 
 -- =============================================================================
+-- Window Management (Configure, Open, Close, Toggle)
+-- =============================================================================
+
+local function configure_window(winid, bufnr)
+    local cfg = M.config.window
+    vim.api.nvim_win_set_buf(winid, bufnr)
+    vim.api.nvim_win_set_width(winid, cfg.width)
+    vim.api.nvim_set_option_value("number", cfg.number, { win = winid })
+    vim.api.nvim_set_option_value("relativenumber", cfg.relativenumber, { win = winid })
+    vim.api.nvim_set_option_value("wrap", cfg.wrap, { win = winid })
+    vim.api.nvim_set_option_value("linebreak", cfg.linebreak, { win = winid })
+    vim.api.nvim_set_option_value("colorcolumn", "", { win = winid })
+    vim.api.nvim_set_option_value("winfixwidth", cfg.winfixwidth, { win = winid })
+    if cfg.winbar then
+        vim.api.nvim_set_option_value("winbar", "%= Mana Chat %=", { win = winid })
+    else
+        vim.api.nvim_set_option_value("winbar", "", { win = winid })
+    end
+end
+
+local function open_window()
+    if state.winid and vim.api.nvim_win_is_valid(state.winid) then
+        vim.api.nvim_set_current_win(state.winid)
+        return
+    end
+    local bufnr = buffer_get()
+    vim.cmd(M.config.window.position)
+    state.winid = vim.api.nvim_get_current_win()
+    configure_window(state.winid, bufnr)
+    vim.schedule(function()
+        if state.winid and vim.api.nvim_win_is_valid(state.winid) then
+            local line_count = vim.api.nvim_buf_line_count(bufnr)
+            vim.api.nvim_win_set_cursor(state.winid, { line_count, 0 })
+            vim.cmd("startinsert")
+        end
+    end)
+end
+
+local function close_window()
+    if state.winid and vim.api.nvim_win_is_valid(state.winid) then
+        vim.api.nvim_win_close(state.winid, true)
+        state.winid = nil
+    end
+end
+
+local function toggle_window()
+    if state.winid and vim.api.nvim_win_is_valid(state.winid) then
+        close_window()
+    else
+        open_window()
+    end
+end
+
+-- =============================================================================
 -- Feature Functions (Yank, Add Buffers)
 -- =============================================================================
 
@@ -478,60 +532,6 @@ local function send_buffers_to_chat(bufnr)
             vim.cmd("startinsert") -- Go to insert mode ready for query
         end
     end)
-end
-
--- =============================================================================
--- Window Management (Configure, Open, Close, Toggle)
--- =============================================================================
-
-local function configure_window(winid, bufnr)
-    local cfg = M.config.window
-    vim.api.nvim_win_set_buf(winid, bufnr)
-    vim.api.nvim_win_set_width(winid, cfg.width)
-    vim.api.nvim_set_option_value("number", cfg.number, { win = winid })
-    vim.api.nvim_set_option_value("relativenumber", cfg.relativenumber, { win = winid })
-    vim.api.nvim_set_option_value("wrap", cfg.wrap, { win = winid })
-    vim.api.nvim_set_option_value("linebreak", cfg.linebreak, { win = winid })
-    vim.api.nvim_set_option_value("colorcolumn", "", { win = winid })
-    vim.api.nvim_set_option_value("winfixwidth", cfg.winfixwidth, { win = winid })
-    if cfg.winbar then
-        vim.api.nvim_set_option_value("winbar", "%= Mana Chat %=", { win = winid })
-    else
-        vim.api.nvim_set_option_value("winbar", "", { win = winid })
-    end
-end
-
-local function open_window()
-    if state.winid and vim.api.nvim_win_is_valid(state.winid) then
-        vim.api.nvim_set_current_win(state.winid)
-        return
-    end
-    local bufnr = buffer_get()
-    vim.cmd(M.config.window.position)
-    state.winid = vim.api.nvim_get_current_win()
-    configure_window(state.winid, bufnr)
-    vim.schedule(function()
-        if state.winid and vim.api.nvim_win_is_valid(state.winid) then
-            local line_count = vim.api.nvim_buf_line_count(bufnr)
-            vim.api.nvim_win_set_cursor(state.winid, { line_count, 0 })
-            vim.cmd("startinsert")
-        end
-    end)
-end
-
-local function close_window()
-    if state.winid and vim.api.nvim_win_is_valid(state.winid) then
-        vim.api.nvim_win_close(state.winid, true)
-        state.winid = nil
-    end
-end
-
-local function toggle_window()
-    if state.winid and vim.api.nvim_win_is_valid(state.winid) then
-        close_window()
-    else
-        open_window()
-    end
 end
 
 -- =============================================================================

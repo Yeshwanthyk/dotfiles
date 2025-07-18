@@ -1,11 +1,4 @@
 ###############################################################################
-#                                .zshrc FILE                                #
-###############################################################################
-# This file contains your shell configuration. It is organized into sections
-# for sourcing external files, environment variables, key bindings, aliases,
-# functions, plugins, and more.
-
-###############################################################################
 # FUNCTIONS
 ###############################################################################
 # Source a file if it exists and is readable.
@@ -56,44 +49,20 @@ autoload -Uz compinit && compinit -i -C
 ###############################################################################
 # ENVIRONMENT VARIABLES
 ###############################################################################
+# User-specific variables
+USER_HOME="/Users/yesh"
+
 export VISUAL=nvim
 export EDITOR=nvim
+export GOBIN="$HOME/go/bin"
 
-# Update PATH (order matters)
-export PATH="/opt/homebrew/bin:/usr/local/bin:/Users/yesh/.cargo/bin:/Users/yesh/.local/share/bob/nvim-bin:/Users/yesh/.bun/bin:$HOME/commands:$PATH"
-
-###############################################################################
-# ZLE (ZSH LINE EDITOR) CUSTOMIZATION
-###############################################################################
-# Show mode indicator in the prompt for vi key bindings (used by Starship)
-# function zle-line-init zle-keymap-select {
-#   RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
-#   RPS2=$RPS1
-#   zle reset-prompt
-# }
-# zle -N zle-line-init
-# zle -N zle-keymap-select
+# Consolidated PATH (order matters)
+export PATH="/opt/homebrew/bin:/usr/local/bin:$USER_HOME/.cargo/bin:$USER_HOME/.local/share/bob/nvim-bin:$USER_HOME/.bun/bin:$HOME/commands:$GOBIN:$PATH"
 
 ###############################################################################
 # STARSHIP PROMPT
 ###############################################################################
 eval "$(starship init zsh)"
-
-###############################################################################
-# KEY BINDINGS & VIM MODE
-###############################################################################
-# (Uncomment the following line to enable full vi-mode)
-
-# Enhanced history search with fzf
-fhist() {
-  print -z $( ([ -n "$ZSH_NAME" ] && fc -l 1 || history) |
-    fzf +s --tac |
-    sed -E 's/ *[0-9]*\*? *//' |
-    sed -E 's/\\/\\\\/g')
-}
-
-# Bind to Ctrl-R
-bindkey -s '^R' 'fhist\n'
 
 ###############################################################################
 # ALIASES
@@ -109,12 +78,22 @@ alias ls='eza'
 alias sl='eza'
 alias lt='eza -lh --git --all --tree'
 
+function git-file-history() {
+  # Step 1: Select a file
+  local file=$(git ls-files | fzf --preview 'bat --color=always {} 2>/dev/null || cat {}')
+  
+  # Step 2: If a file was selected, show its history with delta
+  if [[ -n "$file" ]]; then
+    echo "Showing history for: $file"
+    git log --oneline --follow -- "$file" | fzf --preview "git show {1} -- $file | delta"
+  fi
+}
+
 ## Common commands
 alias c='clear'
-alias s='source ~/.zshrc'
+alias ccc='claude --dangerously-skip-permissions'
 alias rm='rm -I'
-alias op='open .'
-alias v='nvim'
+alias s='source ~/.zshrc'
 
 ## Directory navigation shortcuts
 alias ..="cd .."
@@ -123,41 +102,35 @@ alias ....="cd ../../.."
 alias .....="cd ../../../.."
 alias ......="cd ../../../../.."
 
-## HTTP requests with xh
+## HTTP & Notes
 alias http="xh"
-
-## Notes shortcut
 alias nn="cd ~/notes && ./notes.sh"
 
 ###############################################################################
 # FZF-BASED NAVIGATION HELPERS
 ###############################################################################
-# Change directory then list contents
-cx() { cd "$@" && l; }
-
 # Fuzzy change directory (ignores hidden directories)
-fcd() { cd "$(find . -type d -not -path '*/.*' | fzf)" && l; }
+fcd() { 
+  local dir=$(find . -type d -not -path '*/.*' 2>/dev/null | fzf)
+  [[ -n "$dir" ]] && cd "$dir" && l
+}
 
 # Fuzzy file search and copy filename to clipboard
-f() { echo "$(find . -type f -not -path '*/.*' | fzf)" | pbcopy; }
+f() { 
+  local file=$(find . -type f -not -path '*/.*' 2>/dev/null | fzf)
+  [[ -n "$file" ]] && echo "$file" | pbcopy
+}
 
 # Fuzzy file search and open file in nvim
-fv() { nvim "$(find . -type f -not -path '*/.*' | fzf)"; }
-
-###############################################################################
-# CHEZMOI INTEGRATION
-###############################################################################
-alias dot="chezmoi cd"
-alias dot-add="chezmoi add"
-alias dot-apply="chezmoi -v apply"
-alias dot-diff="chezmoi diff"
-alias dot-edit="chezmoi edit"
+fv() { 
+  local file=$(find . -type f -not -path '*/.*' 2>/dev/null | fzf --preview 'bat --color=always {} 2>/dev/null || cat {} 2>/dev/null')
+  [[ -n "$file" ]] && nvim "$file"
+}
 
 ###############################################################################
 # GIT ALIASES & FUNCTIONS
 ###############################################################################
 alias gc='git commit -m'
-alias gco='git checkout'
 alias ga='git add .'
 alias gst='git status'
 alias gb='git branch'
@@ -166,34 +139,12 @@ alias gcp='git cherry-pick'
 alias gp='git push'
 alias ff='gpr && git pull --ff-only'
 alias grd='git fetch origin && git rebase origin/master'
-alias gbb='git-switchbranch'
 alias gl='pretty_git_log'
 alias gla='pretty_git_log_all'
-alias git-current-branch="git branch | grep \* | cut -d ' ' -f2"
-alias grc='git rebase --continue'
-alias gra='git rebase --abort'
-alias gec='git status | grep "both modified:" | cut -d ":" -f2 | trim | xargs nvim -'
 alias gg='git branch | fzf | xargs git checkout'
 alias gup='git branch --set-upstream-to=origin/$(git-current-branch) $(git-current-branch)'
 alias lg='lazygit'
 alias kvim="NVIM_APPNAME=kvim nvim"
-
-# Git log formatting variables
-LOG_HASH="%C(always,yellow)%h%C(always,reset)"
-LOG_RELATIVE_TIME="%C(always,green)(%ar)%C(always,reset)"
-LOG_AUTHOR="%C(always,blue)<%an>%C(always,reset)"
-LOG_REFS="%C(always,red)%d%C(always,reset)"
-LOG_SUBJECT="%s"
-LOG_FORMAT="$LOG_HASH}$LOG_AUTHOR}$LOG_RELATIVE_TIME}$LOG_SUBJECT $LOG_REFS"
-
-# Git branch formatting variables
-BRANCH_PREFIX="%(HEAD)"
-BRANCH_REF="%(color:red)%(color:bold)%(refname:short)%(color:reset)"
-BRANCH_HASH="%(color:yellow)%(objectname:short)%(color:reset)"
-BRANCH_DATE="%(color:green)(%(committerdate:relative))%(color:reset)"
-BRANCH_AUTHOR="%(color:blue)%(color:bold)<%(authorname)>%(color:reset)"
-BRANCH_CONTENTS="%(contents:subject)"
-BRANCH_FORMAT="}$BRANCH_PREFIX}$BRANCH_REF}$BRANCH_HASH}$BRANCH_DATE}$BRANCH_AUTHOR}$BRANCH_CONTENTS"
 
 # Git log and branch functions
 show_git_head() {
@@ -217,45 +168,9 @@ pretty_git_branch_sorted() {
   git branch -v --color=always --format="${BRANCH_FORMAT}" --sort=-committerdate "$@" | pretty_git_format
 }
 
-pretty_git_format() {
-  sed -Ee 's/(^[^)]*) ago\)/\1)/' | \
-  sed -Ee 's/(^[^)]*), [[:digit:]]+ .*months?\)/\1)/' | \
-  sed -Ee 's/ seconds?\)/s\)/' | \
-  sed -Ee 's/ minutes?\)/m\)/' | \
-  sed -Ee 's/ hours?\)/h\)/' | \
-  sed -Ee 's/ days?\)/d\)/' | \
-  sed -Ee 's/ weeks?\)/w\)/' | \
-  sed -Ee 's/ months?\)/M\)/' | \
-  sed -Ee 's/<Andrew Burgess>/<me>/' | \
-  sed -Ee 's/<([^ >]+) [^>]*>/<\1>/' | \
-  column -s '}' -t
-}
-
-git_page_maybe() {
-  if [ -n "${GIT_NO_PAGER}" ]; then
-    cat
-  else
-    less --quit-if-one-screen --no-init --RAW-CONTROL-CHARS --chop-long-lines
-  fi
-}
-
-# Use fzf and ripgrep to copy or open specific lines
-copy-line() {
-  rg --line-number "${1:-.}" | \
-  fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | \
-  awk -F ':' '{print $3}' | sed 's/^\s\+//' | pbcopy
-}
-
-open-at-line() {
-  vim $(rg --line-number "${1:-.}" | \
-  fzf --delimiter ':' --preview 'bat --color=always --highlight-line {2} {1}' | \
-  awk -F ':' '{print "+"$2" "$1}')
-}
-
 ###############################################################################
 # DOCKER COMMANDS & ALIASES
 ###############################################################################
-alias d='docker'
 alias dc='docker-compose'
 alias dkill="pgrep 'Docker' | xargs kill -9"
 alias docker-clear='dclear'
@@ -331,7 +246,7 @@ setopt hist_ignore_dups        # ignore duplicate commands
 setopt hist_ignore_space       # ignore commands starting with a space
 setopt hist_verify             # verify history expansion before execution
 setopt inc_append_history      # append commands to history immediately
-# setopt share_history         # uncomment to share history between sessions
+setopt share_history           # share history between sessions
 
 ###############################################################################
 # LF FILE MANAGER ICONS
@@ -367,5 +282,45 @@ eval "$(pyenv init -)"
 ###############################################################################
 # ADDITIONAL BINARIES (e.g., pipx)
 ###############################################################################
-export PATH="$PATH:/Users/yesh/.local/bin"
+export PATH="$PATH:$USER_HOME/.local/bin"
+
+# Delta theme switching based on macOS appearance
+delta_theme_switch() {
+    if defaults read -g AppleInterfaceStyle &>/dev/null; then
+        # Dark mode
+        git config delta.features "woolly-mammoth"
+    else
+        # Light mode  
+        git config delta.features "earl-grey"
+    fi
+}
+
+# Auto-switch delta theme on shell startup
+delta_theme_switch
+
+# Manual theme switching aliases
+alias delta-dark='git config delta.features "woolly-mammoth"'
+alias delta-light='git config delta.features "earl-grey"'
+
+#### Yazi
+function y() {
+	local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+	yazi "$@" --cwd-file="$tmp"
+	if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+		builtin cd -- "$cwd"
+	fi
+	rm -f -- "$tmp"
+}
+
+# Additional PATH exports
+export PATH="$PATH:$USER_HOME/.lmstudio/bin:/opt/homebrew/opt/postgresql@17/bin"
+
+# bun completions
+[ -s "$USER_HOME/.bun/_bun" ] && source "$USER_HOME/.bun/_bun"
+
+eval "$(atuin init zsh)"
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/Users/yesh/.lmstudio/bin"
+# End of LM Studio CLI section
 

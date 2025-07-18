@@ -7,7 +7,25 @@ M.config = {
   gateway_url = "http://localhost:3009",
   -- default_model removed as it will be fetched from gateway
   default_session_id = "neovim-session",
-  system_prompt = "You are a helpful programming assistant.",
+  system_prompt = [[You are a precise text replacement assistant. Your task is to modify the selected text according to the user's instruction.
+
+Rules:
+1. Make ONLY the specific change requested in the prompt
+2. Preserve all formatting, structure, indentation, and spacing exactly
+3. Return ONLY the modified text - no explanations, summaries, or additional content
+4. If the instruction is unclear, make the most logical interpretation
+5. For rename/replace operations, substitute all instances of the target text with the new text
+6. For "rename X" without specifying target, choose a concise, clear alternative name
+7. Maintain the exact same text structure and length as much as possible
+
+Examples:
+Instruction: "rename llm-gateway to gateway-new"
+Selected text: "### 2. llm-gateway (Currently Active)"
+Output: "### 2. gateway-new (Currently Active)"
+
+Instruction: "rename llm-gateway"
+Selected text: "### 2. llm-gateway (Currently Active)"
+Output: "### 2. gateway-new (Currently Active)"]],
   keymaps = {
     replace = "<leader>ar", -- Replace selected text with LLM response
     append = "<leader>aa", -- Append LLM response after cursor
@@ -15,8 +33,6 @@ M.config = {
   },
 }
 
--- Store available models
-M.models = {}
 M.active_job = nil
 M.stream_progress = 0 -- Counter for showing streaming progress
 
@@ -62,41 +78,44 @@ end
 
 -- Get visual selection
 function M.get_visual_selection()
-  local _, srow, scol = unpack(vim.fn.getpos("v"))
-  local _, erow, ecol = unpack(vim.fn.getpos("."))
-
-  if vim.fn.mode() == "V" then
-    if srow > erow then
-      return vim.api.nvim_buf_get_lines(0, erow - 1, srow, true)
-    else
-      return vim.api.nvim_buf_get_lines(0, srow - 1, erow, true)
-    end
+  -- Get visual selection marks
+  local start_pos = vim.fn.getpos("'<")
+  local end_pos = vim.fn.getpos("'>")
+  
+  -- Check if we have valid visual marks
+  if start_pos[2] == 0 or end_pos[2] == 0 then
+    return nil
   end
-
-  if vim.fn.mode() == "v" then
-    if srow < erow or (srow == erow and scol <= ecol) then
+  
+  local srow, scol = start_pos[2], start_pos[3]
+  local erow, ecol = end_pos[2], end_pos[3]
+  
+  -- Get the visual mode type from the last visual selection
+  local visual_mode = vim.fn.visualmode()
+  
+  if visual_mode == "V" then
+    -- Line-wise visual selection
+    return vim.api.nvim_buf_get_lines(0, srow - 1, erow, true)
+  elseif visual_mode == "v" then
+    -- Character-wise visual selection
+    if srow == erow then
+      -- Same line selection
       return vim.api.nvim_buf_get_text(0, srow - 1, scol - 1, erow - 1, ecol, {})
     else
-      return vim.api.nvim_buf_get_text(0, erow - 1, ecol - 1, srow - 1, scol, {})
+      -- Multi-line selection
+      return vim.api.nvim_buf_get_text(0, srow - 1, scol - 1, erow - 1, ecol, {})
     end
-  end
-
-  if vim.fn.mode() == "\22" then -- Visual block mode
+  elseif visual_mode == "\22" then
+    -- Visual block mode
     local lines = {}
-    if srow > erow then
-      srow, erow = erow, srow
-    end
-    if scol > ecol then
-      scol, ecol = ecol, scol
-    end
     for i = srow, erow do
-      table.insert(
-        lines,
-        vim.api.nvim_buf_get_text(0, i - 1, math.min(scol - 1, ecol), i - 1, math.max(scol - 1, ecol), {})[1]
-      )
+      local line_text = vim.api.nvim_buf_get_text(0, i - 1, scol - 1, i - 1, ecol, {})
+      table.insert(lines, line_text[1] or "")
     end
     return lines
   end
+  
+  return nil
 end
 
 -- Get content of current file
@@ -110,66 +129,6 @@ function M.get_filetype()
   return vim.bo.filetype
 end
 
--- Fetch models from the gateway
-function M.fetch_models()
-  curl.get({
-    url = M.config.gateway_url .. "/models",
-    headers = {
-      ["Content-Type"] = "application/json",
-    },
-    callback = function(response)
-      if response.status == 200 and response.body then
-        local data = vim.json.decode(response.body)
-        M.models = data.models
-        print("LLM Gateway: Loaded " .. #M.models .. " models (gateway default: " .. (data.default or "N/A") .. ")")
-      else
-        print("LLM Gateway: Failed to fetch models")
-      end
-    end,
-  })
-end
-
--- Select model interactively
-function M.select_model()
-  if #M.models == 0 then
-    print("No models available. Fetching models...")
-    M.fetch_models()
-    return
-  end
-
-  vim.ui.select(M.models, {
-    prompt = "Select LLM model (will set gateway default):",
-    format_item = function(item)
-      return item
-    end,
-  }, function(choice)
-    if choice then
-      -- Update the model on the gateway server
-      curl.post({
-        url = M.config.gateway_url .. "/set-default-model",
-        headers = {
-          ["Content-Type"] = "application/json",
-        },
-        body = vim.json.encode({
-          model = choice,
-          sessionId = M.config.default_session_id,
-        }),
-        callback = function(response)
-          if response.status == 200 and response.body then
-            local data = vim.json.decode(response.body)
-            if data.success and data.defaultModel then
-              print("Gateway default model set to: " .. data.defaultModel)
-            else
-              print("Failed to set default model")
-            end
-          else
-            print("LLM Gateway: Failed to set default model")
-          end
-        end,
-      })
-    end
-  end)
-end
 
 -- Handle streaming response
 function M.handle_stream_response(data)
@@ -204,8 +163,37 @@ function M.invoke_llm(replace)
     prompt = table.concat(visual_lines, "\n")
 
     if replace then
-      vim.api.nvim_command("normal! d")
+      -- Delete the selected text using the visual marks
+      local start_pos = vim.fn.getpos("'<")
+      local end_pos = vim.fn.getpos("'>")
+      local srow, scol = start_pos[2], start_pos[3]
+      local erow, ecol = end_pos[2], end_pos[3]
+      
+      -- Position cursor at start of selection
+      vim.api.nvim_win_set_cursor(0, {srow, scol - 1})
+      
+      -- Delete the selected text based on visual mode
+      local visual_mode = vim.fn.visualmode()
+      if visual_mode == "V" then
+        -- Line-wise: delete entire lines
+        vim.api.nvim_buf_set_lines(0, srow - 1, erow, false, {})
+      elseif visual_mode == "v" then
+        -- Character-wise: delete selected text
+        if srow == erow then
+          -- Same line
+          vim.api.nvim_buf_set_text(0, srow - 1, scol - 1, erow - 1, ecol, {})
+        else
+          -- Multi-line
+          vim.api.nvim_buf_set_text(0, srow - 1, scol - 1, erow - 1, ecol, {})
+        end
+      elseif visual_mode == "\22" then
+        -- Visual block mode: delete block
+        for i = erow, srow, -1 do
+          vim.api.nvim_buf_set_text(0, i - 1, scol - 1, i - 1, ecol, {})
+        end
+      end
     else
+      -- Just clear visual selection for append mode
       vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", false, true, true), "nx", false)
     end
   else
@@ -292,7 +280,9 @@ function M.append_at_cursor()
   M.stream_progress = 0
   current_spinner_frame = 1
 
-  -- Prepare request
+  -- Prepare request with specific system prompt for append operations
+  local append_system_prompt = [[You are a helpful programming assistant. Generate appropriate code or text to append at the cursor position based on the context provided. Be concise and relevant to the file content and cursor position.]]
+  
   local request_data = {
     prompt = "Here is the "
       .. filetype
@@ -301,7 +291,7 @@ function M.append_at_cursor()
       .. "\n\nPlease provide code or text to append at the current cursor position.",
     sessionId = M.config.default_session_id,
     stream = true,
-    systemPrompt = M.config.system_prompt,
+    systemPrompt = append_system_prompt,
   }
 
   -- Set up temporary keymap for cancellation
@@ -361,102 +351,24 @@ function M.append_at_cursor()
   print("Sending request to LLM Gateway...")
 end
 
--- Command to clear session
-function M.clear_session()
-  curl.post({
-    url = M.config.gateway_url .. "/clear",
-    query = {
-      id = M.config.default_session_id,
-    },
-    callback = function(response)
-      if response.status == 200 then
-        print("LLM Gateway: Session cleared")
-      else
-        print("LLM Gateway: Failed to clear session")
-      end
-    end,
-  })
-end
-
--- Function to set default model for the gateway
-function M.set_default_model(model)
-  if not model then
-    -- If no model provided, let the user select
-    M.select_model()
-    return
-  end
-
-  -- Validate model exists
-  local model_valid = false
-  for _, m in ipairs(M.models) do
-    if m == model then
-      model_valid = true
-      break
-    end
-  end
-
-  if not model_valid then
-    print("Model '" .. model .. "' not found in available models")
-    return
-  end
-
-  -- Update the model on the gateway server
-  curl.post({
-    url = M.config.gateway_url .. "/set-default-model",
-    headers = {
-      ["Content-Type"] = "application/json",
-    },
-    body = vim.json.encode({
-      model = model,
-      sessionId = M.config.default_session_id,
-    }),
-    callback = function(response)
-      if response.status == 200 and response.body then
-        local data = vim.json.decode(response.body)
-        if data.success and data.defaultModel then
-          print("Gateway default model set to: " .. data.defaultModel)
-        else
-          print("Failed to set default model")
-        end
-      else
-        print("LLM Gateway: Failed to set default model")
-      end
-    end,
-  })
-end
 
 -- Create plugin commands
 function M.create_commands()
-  vim.api.nvim_create_user_command("DingSelect", function()
-    M.select_model()
-  end, { desc = "Select LLM model" })
-
-  vim.api.nvim_create_user_command("DingClearSession", function()
-    M.clear_session()
-  end, { desc = "Clear LLM session" })
-
-  vim.api.nvim_create_user_command("DingRefreshModels", function()
-    M.fetch_models()
-  end, { desc = "Refresh available LLM models" })
-
-  -- Add command to set default model for gateway
-  vim.api.nvim_create_user_command("DingSetDefault", function(opts)
-    if opts.args and opts.args ~= "" then
-      M.set_default_model(opts.args)
-    else
-      M.select_model() -- If no args, open model selection
-    end
-  end, { nargs = "?", desc = "Set default LLM model for the gateway" })
-
   -- Add direct commands for replace and append
   vim.api.nvim_create_user_command("DingReplace", function()
     M.invoke_llm(true)
   end, { range = true, desc = "Replace selection with LLM response" })
 
   vim.api.nvim_create_user_command("DingAppend", function()
-    if vim.fn.mode() == "n" then
+    -- Check if we have a visual selection by checking the marks
+    local start_pos = vim.fn.getpos("'<")
+    local end_pos = vim.fn.getpos("'>")
+    
+    if start_pos[2] == 0 or end_pos[2] == 0 then
+      -- No visual selection, use normal append
       M.append_at_cursor()
     else
+      -- Visual selection exists, use text replacement logic
       M.invoke_llm(false)
     end
   end, { range = true, desc = "Append LLM response" })
@@ -518,8 +430,6 @@ function M.setup(opts)
     end
   end
 
-  -- Fetch available models on startup
-  M.fetch_models()
 end
 
 return M
