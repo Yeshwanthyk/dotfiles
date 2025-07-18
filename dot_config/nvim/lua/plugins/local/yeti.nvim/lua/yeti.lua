@@ -448,6 +448,251 @@ function M.send_buffers()
   end)
 end
 
+-- Robust replacer functions for flexible matching
+local function simple_replacer(content_lines, find_lines)
+  local results = {}
+  local content_str = table.concat(content_lines, "\n")
+  local find_str = table.concat(find_lines, "\n")
+  
+  if content_str:find(find_str, 1, true) then
+    table.insert(results, {start_line = 1, end_line = #content_lines, match_lines = find_lines})
+  end
+  
+  return results
+end
+
+local function line_trimmed_replacer(content_lines, find_lines)
+  local results = {}
+  
+  -- Remove empty lines at the end of find_lines
+  while #find_lines > 0 and find_lines[#find_lines] == "" do
+    table.remove(find_lines)
+  end
+  
+  if #find_lines == 0 then
+    return results
+  end
+  
+  for i = 1, #content_lines - #find_lines + 1 do
+    local matches = true
+    
+    for j = 1, #find_lines do
+      local content_trimmed = content_lines[i + j - 1]:match("^%s*(.-)%s*$")
+      local find_trimmed = find_lines[j]:match("^%s*(.-)%s*$")
+      
+      if content_trimmed ~= find_trimmed then
+        matches = false
+        break
+      end
+    end
+    
+    if matches then
+      table.insert(results, {
+        start_line = i,
+        end_line = i + #find_lines - 1,
+        match_lines = {}
+      })
+      -- Copy the actual lines from content
+      for j = 1, #find_lines do
+        table.insert(results[#results].match_lines, content_lines[i + j - 1])
+      end
+    end
+  end
+  
+  return results
+end
+
+local function block_anchor_replacer(content_lines, find_lines)
+  local results = {}
+  
+  if #find_lines < 3 then
+    return results
+  end
+  
+  -- Remove empty lines at the end
+  while #find_lines > 0 and find_lines[#find_lines] == "" do
+    table.remove(find_lines)
+  end
+  
+  if #find_lines < 3 then
+    return results
+  end
+  
+  local first_line_find = find_lines[1]:match("^%s*(.-)%s*$")
+  local last_line_find = find_lines[#find_lines]:match("^%s*(.-)%s*$")
+  
+  -- Find blocks where first line matches
+  for i = 1, #content_lines do
+    if content_lines[i]:match("^%s*(.-)%s*$") == first_line_find then
+      -- Look for matching last line
+      for j = i + 2, #content_lines do
+        if content_lines[j]:match("^%s*(.-)%s*$") == last_line_find then
+          table.insert(results, {
+            start_line = i,
+            end_line = j,
+            match_lines = {}
+          })
+          -- Copy the actual lines from content
+          for k = i, j do
+            table.insert(results[#results].match_lines, content_lines[k])
+          end
+          break
+        end
+      end
+    end
+  end
+  
+  return results
+end
+
+local function whitespace_normalized_replacer(content_lines, find_lines)
+  local results = {}
+  
+  local function normalize_whitespace(text)
+    return text:gsub("%s+", " "):match("^%s*(.-)%s*$")
+  end
+  
+  local normalized_find = {}
+  for _, line in ipairs(find_lines) do
+    table.insert(normalized_find, normalize_whitespace(line))
+  end
+  
+  -- Handle single line matches
+  if #find_lines == 1 then
+    local normalized_find_line = normalized_find[1]
+    for i, line in ipairs(content_lines) do
+      if normalize_whitespace(line) == normalized_find_line then
+        table.insert(results, {
+          start_line = i,
+          end_line = i,
+          match_lines = {line}
+        })
+      end
+    end
+  else
+    -- Handle multi-line matches
+    for i = 1, #content_lines - #find_lines + 1 do
+      local matches = true
+      
+      for j = 1, #find_lines do
+        if normalize_whitespace(content_lines[i + j - 1]) ~= normalized_find[j] then
+          matches = false
+          break
+        end
+      end
+      
+      if matches then
+        table.insert(results, {
+          start_line = i,
+          end_line = i + #find_lines - 1,
+          match_lines = {}
+        })
+        -- Copy the actual lines from content
+        for j = 1, #find_lines do
+          table.insert(results[#results].match_lines, content_lines[i + j - 1])
+        end
+      end
+    end
+  end
+  
+  return results
+end
+
+local function indentation_flexible_replacer(content_lines, find_lines)
+  local results = {}
+  
+  local function remove_common_indentation(lines)
+    local non_empty_lines = {}
+    for _, line in ipairs(lines) do
+      if line:match("^%s*$") == nil then
+        table.insert(non_empty_lines, line)
+      end
+    end
+    
+    if #non_empty_lines == 0 then
+      return lines
+    end
+    
+    -- Find minimum indentation
+    local min_indent = math.huge
+    for _, line in ipairs(non_empty_lines) do
+      local indent = line:match("^(%s*)"):len()
+      min_indent = math.min(min_indent, indent)
+    end
+    
+    if min_indent == math.huge or min_indent == 0 then
+      return lines
+    end
+    
+    -- Remove common indentation
+    local result = {}
+    for _, line in ipairs(lines) do
+      if line:match("^%s*$") then
+        table.insert(result, line)
+      else
+        table.insert(result, line:sub(min_indent + 1))
+      end
+    end
+    
+    return result
+  end
+  
+  local normalized_find = remove_common_indentation(find_lines)
+  
+  for i = 1, #content_lines - #find_lines + 1 do
+    local block = {}
+    for j = 1, #find_lines do
+      table.insert(block, content_lines[i + j - 1])
+    end
+    
+    local normalized_block = remove_common_indentation(block)
+    
+    -- Compare normalized versions
+    local matches = true
+    if #normalized_block == #normalized_find then
+      for j = 1, #normalized_find do
+        if normalized_block[j] ~= normalized_find[j] then
+          matches = false
+          break
+        end
+      end
+    else
+      matches = false
+    end
+    
+    if matches then
+      table.insert(results, {
+        start_line = i,
+        end_line = i + #find_lines - 1,
+        match_lines = block
+      })
+    end
+  end
+  
+  return results
+end
+
+-- Try multiple replacer strategies to find a match
+local function find_match_with_replacers(content_lines, find_lines)
+  local replacers = {
+    simple_replacer,
+    line_trimmed_replacer,
+    block_anchor_replacer,
+    whitespace_normalized_replacer,
+    indentation_flexible_replacer,
+  }
+  
+  for _, replacer in ipairs(replacers) do
+    local results = replacer(content_lines, find_lines)
+    if #results > 0 then
+      -- Return the first match found
+      return results[1]
+    end
+  end
+  
+  return nil
+end
+
 -- Debug logging function
 function M.log_debug(message)
   if M.config.debug then
@@ -699,23 +944,12 @@ function M.apply_all_patches()
         start_i = 0 -- Apply creations/insertions at the beginning
         M.log_debug(string.format("Patch %d: Marked as creation/insertion at line 0", i))
       else
-        local found = false
-        for line_num = 1, #target_lines - #patch.old_hunk + 1 do
-          local match = true
-          for hunk_line_idx = 1, #patch.old_hunk do
-            if target_lines[line_num + hunk_line_idx - 1] ~= patch.old_hunk[hunk_line_idx] then
-              match = false
-              break
-            end
-          end
-          if match then
-            start_i = line_num - 1 -- 0-indexed start line
-            M.log_debug(string.format("Patch %d: Found original hunk at line %d (0-indexed)", i, start_i))
-            found = true
-            break
-          end
-        end
-        if not found then
+        -- Use robust replacer strategies to find the match
+        local match_result = find_match_with_replacers(target_lines, patch.old_hunk)
+        if match_result then
+          start_i = match_result.start_line - 1 -- Convert to 0-indexed
+          M.log_debug(string.format("Patch %d: Found original hunk at line %d (0-indexed) using robust matching", i, start_i))
+        else
           M.log_debug(string.format("Patch %d: Old hunk not found in original content of %s", i, filepath))
           table.insert(errors, string.format("Patch %d: Old hunk not found in %s", i, filepath))
           failed_count = failed_count + 1
