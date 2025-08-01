@@ -1,4 +1,0 @@
-layout {
-    pane
-}
-default_shell "fish"
