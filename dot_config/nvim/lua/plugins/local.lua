@@ -105,4 +105,23 @@ Output: "### 2. gateway-new (Currently Active)"
     },
     cmd = { "ManaChat" },
   },
+
+  -- orc
+  --
+  --
+  {
+    dir = "/Users/yesh/Documents/personal/orc/neovim",
+    name = "orc.nvim",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "folke/snacks.nvim",
+    },
+    config = function()
+      require("orc").setup()
+    end,
+    keys = {
+      { "<leader>os", ":OrcPicker<CR>", desc = "Open orc session picker" },
+    },
+    cmd = { "OrcPicker" },
+  },
 }
