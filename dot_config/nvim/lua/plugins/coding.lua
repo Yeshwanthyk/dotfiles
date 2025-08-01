@@ -3,20 +3,6 @@ return {
     "junegunn/vim-easy-align",
   },
 
-  -- better diffing
-  {
-    "sindrets/diffview.nvim",
-    cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewToggleFiles", "DiffviewFocusFiles" },
-    opts = {},
-    keys = { { "<leader>dv", "<cmd>DiffviewOpen<cr>", desc = "DiffView" } },
-  },
-
-  { "akinsho/git-conflict.nvim", version = "*", config = true },
-
-  -- fugitive: Git blame and open in GitHub
-  {
-    "tpope/vim-fugitive",
-  },
 
   {
     "tpope/vim-rhubarb",
