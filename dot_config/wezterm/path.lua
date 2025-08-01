@@ -1,4 +1,0 @@
-return {
-	config = "~/.config/wezterm",
-}
-
