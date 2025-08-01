@@ -43,8 +43,18 @@ if type brew &>/dev/null; then
   FPATH="$(brew --prefix)/share/zsh-completions:$FPATH"
 fi
 
-# Initialize zsh completions with caching (-C) and ignore insecure directories (-i)
-autoload -Uz compinit && compinit -i -C
+# Initialize zsh completions with caching and skip security check
+autoload -Uz compinit && compinit -C
+
+# Completion styling
+zstyle ':completion:*' menu select
+zstyle ':completion:*' list-colors ''
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' verbose yes
+zstyle ':completion:*:descriptions' format '%B%d%b'
+zstyle ':completion:*:messages' format '%d'
+zstyle ':completion:*:warnings' format 'No matches for: %d'
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
 
 ###############################################################################
 # ENVIRONMENT VARIABLES
@@ -127,6 +137,54 @@ fv() {
   [[ -n "$file" ]] && nvim "$file"
 }
 
+# Fuzzy change to parent directory
+fzf-cd-to-parent() {
+  local declare dirs=()
+  get_parent_dirs() {
+    if [[ -d "${1}" ]]; then dirs+=("$1"); else return; fi
+    if [[ "${1}" == '/' ]]; then
+      for _dir in "${dirs[@]}"; do echo $_dir; done
+    else
+      get_parent_dirs $(dirname "$1")
+    fi
+  }
+  local DIR=$(get_parent_dirs $(realpath "${1:-$PWD}") | fzf-tmux --tac)
+  cd "$DIR"
+  ls
+}
+
+# Fuzzy kill processes
+fzf-kill-processes() {
+  local pid
+  pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+
+  if [ "x$pid" != "x" ]
+  then
+    echo $pid | xargs kill -${1:-9}
+  fi
+}
+
+# Fuzzy environment variables
+fzf-env-vars() {
+  local out
+  out=$(env | fzf)
+  echo $(echo $out | cut -d= -f2)
+}
+
+# Fuzzy git status with file editing
+fzf-git-status() {
+    git rev-parse --git-dir > /dev/null 2>&1 || { echo "You are not in a git repository" && return }
+    local selected
+    selected=$(git -c color.status=always status --short |
+        fzf --height 50% "$@" --border -m --ansi --nth 2..,.. \
+        --preview '(git diff --color=always -- {-1} | sed 1,4d; cat {-1}) | head -500' |
+        cut -c4- | sed 's/.* -> //')
+            if [[ $selected ]]; then
+                for prog in $(echo $selected);
+                do; $EDITOR $prog; done;
+            fi
+    }
+
 ###############################################################################
 # GIT ALIASES & FUNCTIONS
 ###############################################################################
@@ -203,8 +261,8 @@ bindkey '^i' expand-or-complete-prefix
 export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 
-# earl grey theme
-export FZF_DEFAULT_OPTS='--color=fg:#605A52,bg:#ffffff,hl:#83577D --color=fg+:#605A52,bg+:#CBD2E1,hl+:#83577D --color=info:#747B4D,prompt:#747B4D,pointer:#83577D --color=marker:#83577D,spinner:#747B4D,header:#9C958B'
+# Theme-neutral FZF configuration that adapts to terminal colors
+export FZF_DEFAULT_OPTS='--color=bw --reverse --border --height=40% --layout=reverse --info=inline'
 
 ###############################################################################
 # ZOXIDE (DIRECTORY JUMPING)
@@ -256,21 +314,60 @@ export LF_ICONS="tw=:st=:ow=:dt=:di=:fi=:ln=:or=:ex=:
 ###############################################################################
 # PLUGIN SOURCING
 ###############################################################################
-# Zsh Syntax Highlighting
-source ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-
-# Zsh Autosuggestions
+# Zsh Autosuggestions with async loading and buffer limit
+export ZSH_AUTOSUGGEST_USE_ASYNC=1
+export ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
 source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
 
 # FZF Tab Plugin
 source ~/.zsh/fzf-tab/fzf-tab.plugin.zsh
 
+# Zsh Syntax Highlighting (must be loaded last)
+source ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+# fzf-tab configuration
+zstyle ':fzf-tab:*' fzf-command fzf
+zstyle ':fzf-tab:*' fzf-pad 4
+zstyle ':fzf-tab:*' fzf-min-height 15
+zstyle ':fzf-tab:complete:*' fzf-preview 'ls -la $realpath 2>/dev/null || echo $realpath'
+zstyle ':fzf-tab:*' switch-group ',' '.'
+# Use default terminal colors for fzf-tab (works with both dark and light themes)
+zstyle ':fzf-tab:*' fzf-flags '--color=bw'
+
 ###############################################################################
-# NODE VERSION MANAGER (NVM)
+# NODE VERSION MANAGER (NVM) - LAZY LOADING
 ###############################################################################
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+
+# Lazy load NVM - only initialize when needed
+nvm() {
+  unfunction nvm
+  [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+  [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+  nvm "$@"
+}
+
+# Also lazy load for node, npm, and npx commands
+node() {
+  unfunction node npm npx nvm 2>/dev/null
+  [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+  [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+  node "$@"
+}
+
+npm() {
+  unfunction node npm npx nvm 2>/dev/null
+  [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+  [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+  npm "$@"
+}
+
+npx() {
+  unfunction node npm npx nvm 2>/dev/null
+  [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+  [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+  npx "$@"
+}
 
 ###############################################################################
 # PYTHON ENVIRONMENTS (pyenv)
@@ -284,23 +381,34 @@ eval "$(pyenv init -)"
 ###############################################################################
 export PATH="$PATH:$USER_HOME/.local/bin"
 
-# Delta theme switching based on macOS appearance
+# Delta theme switching based on macOS appearance (cached)
 delta_theme_switch() {
+    local current_theme cache_file="$HOME/.delta_theme_cache"
+    
+    # Get current system appearance
     if defaults read -g AppleInterfaceStyle &>/dev/null; then
-        # Dark mode
-        git config delta.features "woolly-mammoth"
+        current_theme="dark"
     else
-        # Light mode  
-        git config delta.features "earl-grey"
+        current_theme="light"
+    fi
+    
+    # Check if theme changed since last run
+    if [[ ! -f "$cache_file" ]] || [[ "$(cat "$cache_file" 2>/dev/null)" != "$current_theme" ]]; then
+        if [[ "$current_theme" == "dark" ]]; then
+            git config delta.features "woolly-mammoth"
+        else
+            git config delta.features "github"
+        fi
+        echo "$current_theme" > "$cache_file"
     fi
 }
 
-# Auto-switch delta theme on shell startup
+# Auto-switch delta theme on shell startup (cached)
 delta_theme_switch
 
 # Manual theme switching aliases
 alias delta-dark='git config delta.features "woolly-mammoth"'
-alias delta-light='git config delta.features "earl-grey"'
+alias delta-light='git config delta.features "github"'
 
 #### Yazi
 function y() {
@@ -324,3 +432,7 @@ eval "$(atuin init zsh)"
 export PATH="$PATH:/Users/yesh/.lmstudio/bin"
 # End of LM Studio CLI section
 
+
+# orc aliases
+alias o='orc'
+alias os='orc start "ccc" --title "scratch-$(date +%s | tail -c 7)"'
