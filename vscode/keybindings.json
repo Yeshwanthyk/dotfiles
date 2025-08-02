@@ -1,0 +1,93 @@
+// Place your key bindings in this file to override the defaults
+[
+  // NAVIGATION
+  {
+    "key": "ctrl+shift+a",
+    "command": "workbench.action.terminal.focusNext",
+    "when": "terminalFocus"
+  },
+  {
+    "key": "ctrl+shift+b",
+    "command": "workbench.action.terminal.focusPrevious",
+    "when": "terminalFocus"
+  },
+  {
+    "key": "ctrl+shift+j",
+    "command": "workbench.action.togglePanel"
+  },
+  {
+    "key": "ctrl+shift+n",
+    "command": "workbench.action.terminal.new",
+    "when": "terminalFocus"
+  },
+  {
+    "key": "ctrl+shift+w",
+    "command": "workbench.action.terminal.kill",
+    "when": "terminalFocus"
+  },
+  // FILE TREE
+  {
+    "command": "workbench.action.toggleSidebarVisibility",
+    "key": "ctrl+e"
+  },
+  {
+    "command": "workbench.files.action.focusFilesExplorer",
+    "key": "ctrl+e",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "n",
+    "command": "explorer.newFile",
+    "when": "filesExplorerFocus && !inputFocus"
+  },
+  {
+    "command": "renameFile",
+    "key": "r",
+    "when": "filesExplorerFocus && !inputFocus"
+  },
+  {
+    "key": "shift+n",
+    "command": "explorer.newFolder",
+    "when": "filesExplorerFocus && explorerViewletFocus"
+  },
+  {
+    "key": "shift+n",
+    "command": "workbench.action.newWindow",
+    "when": "filesExplorerFocus && !explorerViewletFocus"
+  },
+  {
+    "command": "deleteFile",
+    "key": "d",
+    "when": "filesExplorerFocus && !inputFocus"
+  },
+
+  // lazygit
+  {
+    "command": "workbench.action.tasks.runTask",
+    "args": "close_lazygit",
+    "key": "shift+ctrl+g"
+  },
+
+  // lobster add
+  {
+    "command": "lobster.addToLobster",
+    "key": "shift+alt+l",
+    "when": "editorFocus || explorerFocus"
+  },
+  {
+    "command": "lobster.generateTextPrompt",
+    "key": "shift+alt+t",
+    "when": "editorFocus || explorerFocus"
+  },
+  {
+    "command": "lobster.generateXmlPrompt",
+    "key": "shift+alt+x",
+    "when": "editorFocus || explorerFocus"
+  },
+  {
+    "command": "lobster.applyChanges",
+    "key": "shift+alt+a",
+    "when": "editorFocus || explorerFocus"
+  }
+
+]
