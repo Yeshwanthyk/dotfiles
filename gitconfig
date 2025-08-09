@@ -1,6 +1,6 @@
 [user]
-	name =
-	email =
+	name = Yesh Yendamuri
+	email = yeshwanth.yk@gmail.com
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
@@ -15,34 +15,10 @@
 [interactive]
     diffFilter = delta --color-only --features=interactive
 
-[delta "earl-grey"]
-  light = true
-  syntax-theme = GitHub
-
-  minus-style = syntax "#F7E5E3"
-  plus-style = syntax "#EDF0E3"
-  minus-emph-style = syntax "#DFBDBA"
-  plus-emph-style = syntax "#D0D6BA"
-
-  commit-decoration-style = bold box ul "#83577D"
-  file-decoration-style = none
-  file-style = "#605A52" bold
-
-  hunk-header-decoration-style = "#CBD2E1" box
-  hunk-header-file-style = "#556995"
-  hunk-header-line-number-style = "#747B4D"
-  hunk-header-style = file line-number syntax
-
-  line-numbers = true
-  line-numbers-left-style = "#9C958B"
-  line-numbers-minus-style = "#8F5652"
-  line-numbers-plus-style = "#747B4D"
-  line-numbers-right-style = "#9C958B"
-  line-numbers-zero-style = "#9C958B"
-
 [delta]
-    features = earl-grey
-    side-by-side = true
+	features = woolly-mammoth
+  side-by-side = true
+
 [alias]
 	a = add
 	c = commit
@@ -81,8 +57,11 @@
 	filesmbr = files master..
 	logmbr = log --reverse master..
   lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --
+
 [pull]
 	ff = only
+
 [merge]
 	conflictstyle = diff3
-
+[delta "woolly-mammoth"]
+	syntax-theme = OneHalfDark
