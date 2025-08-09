@@ -107,8 +107,6 @@ Output: "### 2. gateway-new (Currently Active)"
   },
 
   -- orc
-  --
-  --
   {
     dir = "/Users/yesh/Documents/personal/orc/neovim",
     name = "orc.nvim",
@@ -121,7 +119,9 @@ Output: "### 2. gateway-new (Currently Active)"
     end,
     keys = {
       { "<leader>os", ":OrcPicker<CR>", desc = "Open orc session picker" },
+      { "<leader>oS", ":OrcStart<CR>", desc = "Start orc session" },
+      { "<leader>oq", ":OrcStop<CR>", desc = "Stop orc session" },
     },
-    cmd = { "OrcPicker" },
+    cmd = { "OrcPicker", "OrcStart", "OrcStop" },
   },
 }

@@ -33,8 +33,6 @@ return {
     keys = {
       -- Core git operations
       { "<leader>gG", "<cmd>Git<cr>", desc = "Git Status" },
-      { "<leader>ga", "<cmd>Git add %<cr>", desc = "Git Add File" },
-      { "<leader>gA", "<cmd>Git add .<cr>", desc = "Git Add All" },
       { "<leader>gc", "<cmd>Git commit<cr>", desc = "Git Commit" },
       { "<leader>gC", "<cmd>Git commit --amend<cr>", desc = "Git Commit Amend" },
       { "<leader>gp", "<cmd>Git push<cr>", desc = "Git Push" },
@@ -51,8 +49,6 @@ return {
       
       -- Diff operations
       { "<leader>g<leader>", "<cmd>Gdiffsplit<cr>", desc = "Git Diff Split" },
-      { "<leader>g2", "<cmd>Gdiffsplit HEAD~1<cr>", desc = "Diff vs HEAD~1" },
-      { "<leader>g3", "<cmd>Gdiffsplit HEAD~2<cr>", desc = "Diff vs HEAD~2" },
     },
   },
 
@@ -134,7 +130,8 @@ return {
       {
         "<leader>gd",
         function()
-          if vim.b.diffview_view then
+          local view = require("diffview.lib").get_current_view()
+          if view then
             vim.cmd("DiffviewClose")
           else
             vim.cmd("DiffviewOpen")
