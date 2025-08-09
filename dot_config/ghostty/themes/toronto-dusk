@@ -1,0 +1,33 @@
+# Minimal Dark Toronto theme for Ghostty
+# Converted from nvim colorscheme
+
+# Basic colors
+background = #000000
+foreground = #ffffff
+
+# Cursor
+cursor-color = #ffffff
+cursor-text = #000000
+
+# Selection
+selection-background = #333333
+selection-foreground = #ffffff
+
+# Color palette (16 colors) - extracted from nvim theme terminal colors
+palette = 0=#000000
+palette = 1=#ff8899
+palette = 2=#87ceeb
+palette = 3=#b8860b
+palette = 4=#88d5ff
+palette = 5=#c8a2c8
+palette = 6=#4ec9b0
+palette = 7=#ffffff
+
+palette = 8=#262626
+palette = 9=#ff8899
+palette = 10=#87ceeb
+palette = 11=#b8860b
+palette = 12=#88d5ff
+palette = 13=#c8a2c8
+palette = 14=#4ec9b0
+palette = 15=#ffffff
