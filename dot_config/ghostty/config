@@ -1,11 +1,14 @@
-font-family = CommitMono Nerd Font
+font-family = BerkeleyMono Nerd Font
 background-opacity = 0.85
 background-blur-radius = 70
-theme = dark:catppuccin-frappe,light:earl-grey
-font-size = 17
+theme = dark:toronto-dusk,light:toronto-dawn
+font-size = 15
 window-padding-x = 18
 window-padding-y = 16
 font-thicken = true
+font-feature = -liga
+font-feature = -dlig
+adjust-cell-height = 10%
 mouse-hide-while-typing = true
 scrollback-limit = 1000000
 
@@ -40,3 +43,8 @@ keybind = alt+a>7=goto_tab:7
 keybind = alt+a>8=goto_tab:8
 
 window-save-state = always
+keybind = shift+enter=text:\n
+
+# Terminal capabilities for better TUI support
+# term = xterm-256color
+copy-on-select = false
