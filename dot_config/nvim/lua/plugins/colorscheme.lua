@@ -1,19 +1,40 @@
 return {
 
+  -- Nord colorscheme
+  {
+    "gbprod/nord.nvim",
+    lazy = false,
+    priority = 999,
+    config = function()
+      require("nord").setup({})
+    end,
+  },
+
   -- Grey colorscheme
   {
     "yorickpeterse/nvim-grey",
-    lazy = false,
+    lazy = true,
     priority = 1000,
     config = function()
       vim.cmd("colorscheme grey")
+    end,
+  },
+  
+  -- Custom minimal dark colorscheme
+  {
+    name = "minimal-dark-toronto",
+    dir = vim.fn.stdpath("config") .. "/colors",
+    lazy = false,
+    priority = 1001,
+    config = function()
+      vim.cmd("colorscheme minimal-dark-toronto")
     end,
   },
 
   -- Soothing pastel theme
   {
     "catppuccin/nvim",
-    lazy = false,
+    lazy = true,
     priority = 1000,
     name = "catppuccin",
     opts = {
@@ -66,8 +87,8 @@ return {
         end,
       },
     },
-    config = function()
-      vim.cmd("colorscheme catppuccin")
-    end,
+    -- config = function()
+    --   vim.cmd("colorscheme catppuccin")
+    -- end,
   },
 }

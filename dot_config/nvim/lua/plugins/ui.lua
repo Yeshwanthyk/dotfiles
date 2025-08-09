@@ -16,4 +16,11 @@ return {
       vim.keymap.set("n", "<C-Space>", nvim_tmux_nav.NvimTmuxNavigateNext)
     end,
   },
+
+  {
+    "brianhuster/live-preview.nvim",
+    dependencies = {
+      "folke/snacks.nvim",
+    },
+  },
 }
