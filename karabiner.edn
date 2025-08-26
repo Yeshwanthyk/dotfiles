@@ -1,0 +1,145 @@
+; =============================================================================
+; KARABINER-ELEMENTS CONFIGURATION WITH GOKU
+; =============================================================================
+; This file configures custom keyboard mappings using Goku syntax.
+; Run `goku` in terminal to apply changes to Karabiner-Elements.
+; 
+; MODIFIER KEY SYNTAX:
+; ! | means mandatory modifier
+; # | means optional modifier  
+; C | left_command    Q | right_command
+; T | left_control    W | right_control  
+; O | left_option     E | right_option
+; S | left_shift      R | right_shift
+; F | fn              P | caps_lock
+; !! | hyper (command + control + option + shift)
+; ## | optional any modifier
+; =============================================================================
+
+{:main [
+  ; =============================================================================
+  ; TAB → SYMBOL LAYER (Hold Tab + letters for symbols)
+  ; =============================================================================
+  ; HOW TO USE:
+  ; - Hold Tab key down (for 100ms) to activate symbol layer
+  ; - While holding Tab, press letter keys to get symbols
+  ; - Release Tab to deactivate layer
+  ; - Single tap Tab = normal tab character
+  
+  {:des "Tab hold → symbol layer"
+   :rules [
+    ; This rule detects when Tab is held vs tapped
+    [:tab nil nil
+     {:alone {:key :tab}                                        ; Single tap = normal tab
+      :held [{:set ["tabsym" 1]}]                              ; Hold = activate symbol layer
+      :afterup [{:set ["tabsym" 0]}]                           ; Release = deactivate layer
+      :params {:basic.to_if_held_down_threshold_milliseconds 100}}] ; 100ms to activate (very fast)
+  ]}
+
+  ; Symbol mappings when Tab layer is active
+  {:des "Tab-symbol mappings"
+   :rules [:tabsym                                              ; Only active when tabsym variable = 1
+    ; Top row symbols (Tab + u,i,o)
+    [:##u :!Ssemicolon]        ; Tab + u = : (colon)
+    [:##i :!Shyphen]           ; Tab + i = _ (underscore)  
+    [:##o :!Sequal_sign]       ; Tab + o = + (plus)
+    ; p is unassigned
+    
+    ; Home row symbols (Tab + h,j,k,l)
+    [:##h :!S9]                ; Tab + h = ( (open parenthesis)
+    [:##j :!S0]                ; Tab + j = ) (close parenthesis)
+    [:##k :!Sopen_bracket]     ; Tab + k = { (open brace)
+    [:##l :!Sclose_bracket]    ; Tab + l = } (close brace)
+   ]}
+
+  ; =============================================================================
+  ; HOME ROW MODIFIERS (; ' as Ctrl Cmd)
+  ; =============================================================================
+  ; HOW TO USE:
+  ; - Hold ; (250ms) = Control modifier
+  ; - Hold ' (250ms) = Command modifier  
+  ; - Single tap = normal character (;, ')
+  ; - Use with left-hand keys to avoid conflicts
+  
+  {:des "Home row mods - ; '"
+   :rules [
+    ; ; = Control (tap ;, hold Ctrl) 
+    [:semicolon :left_control nil {:alone {:key :semicolon}
+                                  :params {:basic.to_if_held_down_threshold_milliseconds 250}}]
+    
+    ; ' = Command (tap ', hold Cmd)
+    [:quote :left_command nil {:alone {:key :quote}
+                              :params {:basic.to_if_held_down_threshold_milliseconds 250}}]
+  ]}
+
+
+  ; =============================================================================  
+  ; RIGHT SHIFT → NUMBER PAD (Hold Right Shift + letters for numbers)
+  ; =============================================================================
+  ; HOW TO USE:
+  ; - Hold Right Shift key down (for 200ms) to activate number pad
+  ; - While holding Right Shift, press keys to get numbers:
+  ;   q w e = 1 2 3 (top row)
+  ;   a s d = 4 5 6 (home row) 
+  ;   z x c = 7 8 9 (bottom row)
+  ;   f     = 0     (zero)
+  ; - Release Right Shift to deactivate
+  ; - Single tap Right Shift = normal shift
+  
+  {:des "Right Shift hold → number pad"
+   :rules [
+    [:right_shift :right_shift nil
+     {:held [{:set ["numpad" 1]}]                             ; Hold = activate number layer  
+      :afterup [{:set ["numpad" 0]}]                          ; Release = deactivate layer
+      :params {:basic.to_if_held_down_threshold_milliseconds 200}}] ; 200ms to activate (fast)
+  ]}
+
+  ; Number mappings when Right Shift layer is active  
+  {:des "Right Shift-number mappings"
+   :rules [:numpad                                             ; Only active when numpad variable = 1
+    ; Number layout matches left-hand home position:
+    ; Q W E = 1 2 3 (top row - ring, middle, index finger)
+    [:##q :1]              
+    [:##w :2]              
+    [:##e :3]              
+    
+    ; A S D = 4 5 6 (home row)
+    [:##a :4]              
+    [:##s :5]              
+    [:##d :6]      
+    
+    ; Z X C = 7 8 9 (bottom row)
+    [:##z :7]              
+    [:##x :8]          
+    [:##c :9]         
+    
+    ; F = 0 (zero key)
+    [:##f :0]          
+   ]}
+
+  ; =============================================================================
+  ; CAPS LOCK → ESC (tap) / HYPER (hold)
+  ; =============================================================================
+  ; HOW TO USE:
+  ; - Single tap Caps Lock = Escape key (useful for Vim)
+  ; - Hold Caps Lock = Hyper modifier (Cmd+Ctrl+Option+Shift)
+  ; - Use Hyper + other keys for global shortcuts that won't conflict
+  ; - Example: Hyper+Space for app launcher, Hyper+1 for app switching
+  
+  {:des "Caps = Esc (tap) / Hyper (hold)"
+   :rules [
+    [:##caps_lock :!!left_shift nil {:alone {:key :escape}}]  ; Tap = Esc, Hold = Hyper
+  ]}
+]}
+
+; =============================================================================
+; SUMMARY OF ACTIVE MAPPINGS:
+; =============================================================================
+; Tab (hold) + letters     = Symbols: u=:, i=_, o=+, hj=(), kl={}
+; Right Shift (hold) + letters = Numbers: qwe=123, asd=456, zxc=789, f=0
+; Home row mods (250ms)    = ;=Ctrl, '=Cmd (tap for characters)
+; Caps Lock (tap)          = Escape
+; Caps Lock (hold)         = Hyper modifier
+; 
+; Tab activates in 100ms, Right Shift in 200ms for fast response.
+; =============================================================================
